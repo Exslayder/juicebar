@@ -1,0 +1,50 @@
+#include <winver.h>
+#include "version.h"
+
+1 ICON "app.ico"
+201 RCDATA "../fonts/ch_text.ttf"
+202 RCDATA "../fonts/ch_medium.ttf"
+203 RCDATA "../fonts/ch_semibold.ttf"
+
+310 RCDATA "icons/battery-charge.png"
+341 RCDATA "icons/headphones_fill.png"
+342 RCDATA "icons/keyboard_fill.png"
+343 RCDATA "icons/gamepad_fill.png"
+344 RCDATA "icons/speaker_fill.png"
+345 RCDATA "icons/phone_fill.png"
+346 RCDATA "icons/mouse_fill.png"
+320 RCDATA "icons/battery0.png"
+321 RCDATA "icons/battery1.png"
+322 RCDATA "icons/battery2.png"
+323 RCDATA "icons/battery3.png"
+324 RCDATA "icons/battery4.png"
+325 RCDATA "icons/battery5.png"
+326 RCDATA "icons/battery6.png"
+327 RCDATA "icons/battery7.png"
+328 RCDATA "icons/battery8.png"
+329 RCDATA "icons/battery9.png"
+330 RCDATA "icons/battery10.png"
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION 1,0,0,0
+PRODUCTVERSION 1,0,0,0
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "FileDescription", "JuiceBar"
+      VALUE "ProductName", "JuiceBar"
+      VALUE "FileVersion", JB_VERSION_STRING
+      VALUE "ProductVersion", JB_VERSION_STRING
+      VALUE "OriginalFilename", "JuiceBar.exe"
+      VALUE "LegalCopyright", "MIT License"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1200
+  END
+END

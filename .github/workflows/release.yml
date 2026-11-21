@@ -1,0 +1,70 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (without the leading v)"
+        required: true
+        default: "1.0.0"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $version = "${{ inputs.version }}"
+          if (-not $version) { $version = "${{ github.ref_name }}".TrimStart("v") }
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Unexpected version '$version'" }
+          "value=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Building JuiceBar $version"
+
+      - name: Fetch pinned MinGW-w64 toolchain
+        shell: pwsh
+        run: ./scripts/toolchain.ps1
+
+      - name: Build and test
+        shell: pwsh
+        run: ./build.ps1 -Version "${{ steps.version.outputs.value }}" -Tests
+
+      - name: Build installer and portable archive
+        shell: pwsh
+        run: ./installer/build-installer.ps1 -Version "${{ steps.version.outputs.value }}"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: juicebar-${{ steps.version.outputs.value }}
+          path: |
+            build/JuiceBar.exe
+            dist/*
+          if-no-files-found: error
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.value }}
+          name: JuiceBar ${{ steps.version.outputs.value }}
+          draft: true
+          prerelease: false
+          body_path: docs/RELEASE_NOTES.md
+          files: |
+            build/JuiceBar.exe
+            dist/JuiceBar-${{ steps.version.outputs.value }}-setup.exe
+            dist/JuiceBar-${{ steps.version.outputs.value }}-portable.zip

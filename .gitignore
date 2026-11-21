@@ -1,0 +1,11 @@
+build/
+.toolchain/
+.devdata/
+.reference/
+*.o
+*.exe
+*.pdb
+.vscode/
+.idea/
+*.log
+dist/
