@@ -35,11 +35,7 @@ administrator rights, no UAC prompt — and puts the app into `%LOCALAPPDATA%\Pr
 with a Start menu shortcut.
 
 Release binaries are built by GitHub Actions from the tagged commit; the workflow runs the unit
-tests, then produces the installer and the portable archive.
-
-There is also a portable build: unpack `JuiceBar-1.0.0-portable.zip` anywhere and run
-`JuiceBar.exe`. Settings and history stay next to the exe if a `portable.flag` file is present,
-otherwise in the usual AppData folders.
+tests, then produces the installer.
 
 To remove the app, use *Settings → Apps → Installed apps → JuiceBar* or the uninstaller in the
 install folder. Your settings and history are kept; delete `%APPDATA%\JuiceBar` and
@@ -139,7 +135,7 @@ To build the installer you need [Inno Setup 6+](https://jrsoftware.org/isinfo.ph
 powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1 -Version 1.0.0
 ```
 
-The result is `dist\JuiceBar-<version>-setup.exe` (and a portable zip next to it).
+The result is `dist\JuiceBar-<version>-setup.exe`.
 
 ## Data & privacy
 

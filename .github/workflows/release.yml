@@ -43,7 +43,7 @@ jobs:
         shell: pwsh
         run: ./build.ps1 -Version "${{ steps.version.outputs.value }}" -Tests
 
-      - name: Build installer and portable archive
+      - name: Build installer
         shell: pwsh
         run: ./installer/build-installer.ps1 -Version "${{ steps.version.outputs.value }}"
 
@@ -51,9 +51,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: juicebar-${{ steps.version.outputs.value }}
-          path: |
-            build/JuiceBar.exe
-            dist/*
+          path: dist/*
           if-no-files-found: error
 
       - name: Create draft release
@@ -64,7 +62,4 @@ jobs:
           draft: true
           prerelease: false
           body_path: docs/RELEASE_NOTES.md
-          files: |
-            build/JuiceBar.exe
-            dist/JuiceBar-${{ steps.version.outputs.value }}-setup.exe
-            dist/JuiceBar-${{ steps.version.outputs.value }}-portable.zip
+          files: dist/JuiceBar-${{ steps.version.outputs.value }}-setup.exe

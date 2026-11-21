@@ -9,9 +9,6 @@ Download `JuiceBar-1.0.0-setup.exe` and run it. The installer is per-user: no ad
 rights, no UAC prompt. It installs to `%LOCALAPPDATA%\Programs\JuiceBar`, adds a Start menu
 shortcut, and registers an uninstaller.
 
-Prefer a portable copy? `JuiceBar-1.0.0-portable.zip` runs from any folder and keeps settings and
-history next to the exe.
-
 ## What's new
 
 - First public release.

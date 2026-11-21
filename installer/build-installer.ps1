@@ -1,4 +1,4 @@
-# Builds the Windows installer and the portable archive for JuiceBar.
+# Builds the Windows installer for JuiceBar.
 # Requires Inno Setup 6+ (https://jrsoftware.org/isinfo.php). On CI Chocolatey installs it.
 param(
     [Parameter(Mandatory = $true)][string]$Version
@@ -42,25 +42,9 @@ if (-not $iscc) {
 
 New-Item -ItemType Directory -Force $dist | Out-Null
 Remove-Item (Join-Path $dist "JuiceBar-$Version-setup.exe") -Force -ErrorAction SilentlyContinue
-Remove-Item (Join-Path $dist "JuiceBar-$Version-portable.zip") -Force -ErrorAction SilentlyContinue
 
 Write-Host "Building installer with $iscc ..."
 & $iscc "/DMyVersion=$Version" (Join-Path $PSScriptRoot "juicebar.iss")
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
-
-Write-Host "Building portable archive ..."
-$stage = Join-Path $env:TEMP ("juicebar-portable-" + [guid]::NewGuid().ToString("N"))
-New-Item -ItemType Directory -Force $stage | Out-Null
-try {
-    Copy-Item $exe (Join-Path $stage "JuiceBar.exe")
-    Copy-Item (Join-Path $root "LICENSE") $stage
-    Copy-Item (Join-Path $root "README.md") $stage
-    Copy-Item (Join-Path $root "CHANGELOG.md") $stage
-    # Keeps settings and history next to the exe instead of in AppData.
-    New-Item -ItemType File (Join-Path $stage "portable.flag") | Out-Null
-    Compress-Archive -Path (Join-Path $stage "*") -DestinationPath (Join-Path $dist "JuiceBar-$Version-portable.zip") -Force
-} finally {
-    Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
-}
 
 Get-ChildItem $dist | Select-Object Name, Length | Format-Table -AutoSize
