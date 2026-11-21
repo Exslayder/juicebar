@@ -12,8 +12,11 @@ struct HidInterface {
     std::wstring product, manufacturer, serial;
 };
 
-// Every present HID collection on the system (one entry per interface path).
-std::vector<HidInterface> EnumerateHid();
+// Present HID collections (one entry per interface path). By default only the vendor IDs the
+// app knows are opened: opening every HID device on the system can block for a long time on a
+// device that is asleep or being removed, which used to leave the pill empty for a minute after
+// a restart. Pass all=true for --dump.
+std::vector<HidInterface> EnumerateHid(bool all = false);
 
 class Hid {
 public:

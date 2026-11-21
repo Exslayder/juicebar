@@ -13,7 +13,6 @@
 
 #include <algorithm>
 #include <atomic>
-#include <cstdio>
 #include <cwchar>
 #include <map>
 #include <memory>
@@ -219,12 +218,23 @@ void BuildCards(const std::vector<Reading>& fresh, int64_t now) {
 
 DWORD WINAPI PollThread(LPVOID) {
     HANDLE waits[2] = { app.wakeEvent, app.stopEvent };
+    int emptyRetries = 0;
     for (;;) {
-        DWORD wait = WaitForMultipleObjects(2, waits, FALSE, (DWORD)(app.pollSeconds.load() * 1000));
+        // A full interval normally, but if the last read found nothing (common right after a
+        // restart, while Windows re-enumerates the HID devices) retry shortly instead of leaving
+        // the pill empty for a whole minute.
+        DWORD timeout = (DWORD)(app.pollSeconds.load() * 1000);
+        if (emptyRetries > 0) timeout = 5000;
+        DWORD wait = WaitForMultipleObjects(2, waits, FALSE, timeout);
         if (wait == WAIT_OBJECT_0 + 1) break;
         if (wait == WAIT_TIMEOUT && app.exiting) break;
 
         PollReport* report = new PollReport(PollDevices());
+        if (report->devices.empty()) {
+            if (emptyRetries < 3) ++emptyRetries;
+        } else {
+            emptyRetries = 0;
+        }
         if (!PostMessageW(app.hwnd, WM_APP_POLL, 0, (LPARAM)report)) delete report;
     }
     return 0;
@@ -363,6 +373,9 @@ int Run(int argc, wchar_t** argv) {
         return 0;
     }
 
+    // CreateMutexW only reports ERROR_ALREADY_EXISTS reliably when the last error is cleared
+    // first; otherwise a stale error from an earlier call can make the app silently exit.
+    SetLastError(0);
     HANDLE mutex = CreateMutexW(nullptr, FALSE, kMutexName);
     const bool alreadyRunning = mutex && GetLastError() == ERROR_ALREADY_EXISTS;
 

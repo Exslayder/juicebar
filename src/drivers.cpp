@@ -524,7 +524,6 @@ void PollXInput(std::vector<Reading>& out) {
 PollReport PollDevices() {
     PollReport report;
     std::vector<HidInterface> hid = EnumerateHid();
-
     PollSteelSeries(hid, report.devices, report.log);
     PollRazer(hid, report.devices, report.log);
     PollBluetooth(report.devices);
@@ -543,7 +542,7 @@ PollReport PollDevices() {
 
 std::wstring DumpHid() {
     std::wstring out = L"HID collections:\n";
-    auto list = EnumerateHid();
+    auto list = EnumerateHid(true);
     std::sort(list.begin(), list.end(), [](const HidInterface& a, const HidInterface& b) {
         if (a.vid != b.vid) return a.vid < b.vid;
         if (a.pid != b.pid) return a.pid < b.pid;

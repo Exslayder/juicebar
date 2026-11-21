@@ -24,7 +24,7 @@ int InterfaceNumberFromPath(const std::wstring& path) {
 
 } // namespace
 
-std::vector<HidInterface> EnumerateHid() {
+std::vector<HidInterface> EnumerateHid(bool all) {
     std::vector<HidInterface> result;
     GUID hidGuid{};
     HidD_GetHidGuid(&hidGuid);
@@ -47,6 +47,13 @@ std::vector<HidInterface> EnumerateHid() {
 
         HidInterface info;
         info.path = detail->DevicePath;
+        if (!all) {
+            // HID paths look like \\?\hid#vid_1038&pid_1838&mi_03&col01#...
+            std::wstring lower = info.path;
+            for (auto& ch2 : lower) ch2 = (wchar_t)towlower(ch2);
+            if (lower.find(L"vid_1038") == std::wstring::npos && lower.find(L"vid_1532") == std::wstring::npos)
+                continue;
+        }
         info.mi = InterfaceNumberFromPath(info.path);
 
         HANDLE h = CreateFileW(info.path.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
