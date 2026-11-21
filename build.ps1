@@ -34,7 +34,10 @@ $flags = @(
     "-std=c++17", "-O2", "-municode", "-mwindows", "-static", "-s",
     "-Wall", "-Wextra", "-Wno-unused-parameter", "-Wno-missing-field-initializers",
     "-Wno-cast-function-type",
-    "-D_WIN32_WINNT=0x0A00", "-DWINVER=0x0A00", "-DUNICODE", "-D_UNICODE"
+    "-D_WIN32_WINNT=0x0A00", "-DWINVER=0x0A00", "-DUNICODE", "-D_UNICODE",
+    # No PE timestamp: two builds of the same commit are byte-identical, so anyone can verify a
+    # release binary by rebuilding it.
+    "-Wl,--no-insert-timestamp"
 )
 $libs = @(
     "-lgdiplus", "-lhid", "-lsetupapi", "-lcfgmgr32", "-lole32", "-loleaut32",

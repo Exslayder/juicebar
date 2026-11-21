@@ -129,6 +129,11 @@ powershell -ExecutionPolicy Bypass -File test.ps1
 `build.ps1` compiles the native sources in `src\`, embeds the icons and the three Inter faces, and
 writes a single self-contained `build\JuiceBar.exe`.
 
+The build is reproducible: the linker does not insert a PE timestamp, so two builds of the same
+commit with the same toolchain are byte-identical (SHA-256), and anyone can verify a release
+binary by rebuilding it. The toolchain script also verifies the SHA-256 of the downloaded
+MinGW archive before extracting it.
+
 To build the installer you need [Inno Setup 6+](https://jrsoftware.org/isinfo.php):
 
 ```powershell
