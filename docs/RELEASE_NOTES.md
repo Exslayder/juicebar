@@ -6,8 +6,8 @@ Windows taskbar, with no vendor software.
 ## Install
 
 Download `JuiceBar-1.0.0-setup.exe` and run it. The installer is per-user: no administrator
-rights, no UAC prompt. It installs to `%LOCALAPPDATA%\Programs\JuiceBar`, adds a Start menu
-shortcut, and registers an uninstaller.
+rights, no UAC prompt. It installs to `%LOCALAPPDATA%\Programs\JuiceBar` by default (the wizard
+lets you choose another folder), adds a Start menu shortcut, and registers an uninstaller.
 
 ## What's new
 

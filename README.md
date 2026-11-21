@@ -1,5 +1,11 @@
 # JuiceBar
 
+[![release](https://img.shields.io/github/v/release/Exslayder/juicebar?label=release)](https://github.com/Exslayder/juicebar/releases/latest)
+[![build](https://github.com/Exslayder/juicebar/actions/workflows/release.yml/badge.svg)](https://github.com/Exslayder/juicebar/actions/workflows/release.yml)
+[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D4)](#requirements)
+[![telemetry](https://img.shields.io/badge/telemetry-none-brightgreen)](#data--privacy)
+
 Battery level **and remaining time** for wireless mice, headsets and controllers — right on the
 Windows taskbar, without vendor software.
 
@@ -31,8 +37,9 @@ measurement, and it is labelled while the data is still thin.
 ## Install
 
 Download `JuiceBar-1.0.0-setup.exe` from the release and run it. The installer is per-user — no
-administrator rights, no UAC prompt — and puts the app into `%LOCALAPPDATA%\Programs\JuiceBar`
-with a Start menu shortcut.
+administrator rights, no UAC prompt. By default it installs into
+`%LOCALAPPDATA%\Programs\JuiceBar` and adds a Start menu shortcut; the wizard also lets you pick
+another folder (for example `D:\Apps\JuiceBar`).
 
 Release binaries are built by GitHub Actions from the tagged commit; the workflow runs the unit
 tests, then produces the installer.
