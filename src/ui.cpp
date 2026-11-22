@@ -747,10 +747,43 @@ void TrackLeave(HWND wnd) {
     TrackMouseEvent(&t);
 }
 
+// Borderless ("fullscreen windowed") games cover the whole monitor, including the strip the
+// taskbar lives on, but Windows still reports a normal notification state. Detect the window
+// itself: if the foreground window covers the monitor of our taskbar, treat it as fullscreen.
+bool ForegroundCoversTaskbar() {
+    HWND foreground = GetForegroundWindow();
+    if (!foreground) return false;
+
+    DWORD pid = 0;
+    GetWindowThreadProcessId(foreground, &pid);
+    if (pid == GetCurrentProcessId()) return false;
+
+    wchar_t cls[64] = {};
+    GetClassNameW(foreground, cls, 64);
+    if (!_wcsicmp(cls, L"Progman") || !_wcsicmp(cls, L"WorkerW") ||
+        !_wcsicmp(cls, L"Shell_TrayWnd") || !_wcsicmp(cls, L"Shell_SecondaryTrayWnd"))
+        return false;   // the desktop or the taskbar itself are never a game
+
+    HWND taskbar = FindWindowW(L"Shell_TrayWnd", nullptr);
+    if (!taskbar) return false;
+    HMONITOR monitor = MonitorFromWindow(taskbar, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO info{ sizeof(info) };
+    if (!GetMonitorInfoW(monitor, &info)) return false;
+
+    RECT window{};
+    if (!GetWindowRect(foreground, &window)) return false;
+    const RECT& screen = info.rcMonitor;
+    const LONG tolerance = 2;
+    return window.left <= screen.left + tolerance && window.top <= screen.top + tolerance &&
+           window.right >= screen.right - tolerance && window.bottom >= screen.bottom - tolerance;
+}
+
 bool FullscreenApp() {
     QUERY_USER_NOTIFICATION_STATE state{};
-    if (FAILED(SHQueryUserNotificationState(&state))) return false;
-    return state == QUNS_BUSY || state == QUNS_RUNNING_D3D_FULL_SCREEN || state == QUNS_PRESENTATION_MODE;
+    if (SUCCEEDED(SHQueryUserNotificationState(&state)) &&
+        (state == QUNS_BUSY || state == QUNS_RUNNING_D3D_FULL_SCREEN || state == QUNS_PRESENTATION_MODE))
+        return true;
+    return ForegroundCoversTaskbar();
 }
 
 void Animate() {
