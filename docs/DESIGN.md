@@ -24,8 +24,9 @@ and the panel get real per-pixel transparency and rounded edges without a browse
 
 ## Icons
 
-- Fluent System Icons (MIT) and Lucide (ISC) are embedded as resources (`res/`), loaded once and
-  tinted at draw time. No web fonts, no inline SVG.
+- Device glyphs are Material Symbols Rounded (Apache-2.0); battery marks are Fluent System Icons
+  (MIT). Both are embedded as PNG resources (`res/`), loaded once and tinted at draw time. No web
+  fonts, no inline SVG.
 
 ## Motion
 

@@ -10,8 +10,11 @@ JuiceBar is MIT licensed. It uses the following assets and protocol research.
 
 ## Icons
 
+- **Material Symbols Rounded** by Google — Apache-2.0,
+  https://fonts.google.com/icons?selected=Material+Symbols+Rounded (device glyphs: mouse,
+  headphones, keyboard, gamepad, speaker, phone)
 - **Fluent System Icons** by Microsoft — MIT, https://github.com/microsoft/fluentui-system-icons
-- **Lucide** — ISC, https://github.com/lucide-icons/lucide (mouse glyph)
+  (battery glyphs)
 - The application icon is the Fluent `flash` glyph on a generated violet squircle.
 
 ## Runtime
