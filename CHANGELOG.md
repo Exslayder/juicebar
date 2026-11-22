@@ -4,6 +4,25 @@ All notable changes to JuiceBar are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] — 2026-11-22
+
+### Fixed
+
+- The pill and panel now hide for borderless fullscreen games (any foreground window covering the
+  monitor of the taskbar), not only for exclusive fullscreen.
+- Startup could show "no devices" for up to 80 seconds: HID enumeration opened every device on the
+  system and one sleeping Bluetooth interface blocked it. Only known vendor IDs are opened now
+  (80 s → ~16 ms), and an empty poll is retried after 5 s.
+- A stale `ERROR_ALREADY_EXISTS` could make the single-instance check exit the app silently; the
+  last error is cleared before `CreateMutex`.
+
+### Changed
+
+- Device glyphs are Material Symbols Rounded (Apache-2.0) in the pill and the panel; battery marks
+  stay Fluent. Charging is green, low battery red, sleeping devices dimmed.
+- README badges and repository topics; the installer's folder choice is documented.
+- Reproducible builds: no PE timestamp, and the pinned MinGW archive is verified by SHA-256.
+
 ## [1.0.0] — 2026-11-21
 
 First public release.
