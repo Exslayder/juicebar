@@ -139,9 +139,7 @@ void ShowMenu(HWND owner) {
                 T(L"Над часами", L"Above the clock"));
     AppendMenuW(placement, MF_STRING | (app.settings.pillPlacement == 1 ? MF_CHECKED : 0), ID_PLACE_TASKBAR,
                 T(L"На панели задач", L"On the taskbar"));
-    HMENU settingsMenu = CreatePopupMenu();
-    AppendMenuW(settingsMenu, MF_POPUP, (UINT_PTR)placement, T(L"Расположение", L"Placement"));
-    AppendMenuW(menu, MF_POPUP, (UINT_PTR)settingsMenu, T(L"Настройки", L"Settings"));
+    AppendMenuW(menu, MF_POPUP, (UINT_PTR)placement, T(L"Расположение", L"Placement"));
 
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, ID_QUIT, T(L"Выход", L"Exit"));
