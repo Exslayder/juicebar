@@ -36,7 +36,7 @@ measurement, and it is labelled while the data is still thin.
 
 ## Install
 
-Download `JuiceBar-1.0.1-setup.exe` from the latest release and run it. The installer is per-user — no
+Download `JuiceBar-1.0.2-setup.exe` from the latest release and run it. The installer is per-user — no
 administrator rights, no UAC prompt. By default it installs into
 `%LOCALAPPDATA%\Programs\JuiceBar` and adds a Start menu shortcut; the wizard also lets you pick
 another folder (for example `D:\Apps\JuiceBar`).
@@ -54,6 +54,8 @@ install folder. Your settings and history are kept; delete `%APPDATA%\JuiceBar` 
 |---|---|---|
 | SteelSeries Aerox 3 / 3 Gen 2 / 5 / 9 Wireless, Prime Wireless, CS2 and Diablo IV editions | 2.4 GHz receiver or USB cable | firmware battery step (0–100 % in 5 % steps; Gen 2 in 1 % steps) + charging flag |
 | Razer Barracuda X (2022), PIDs `1532:0550` / `1532:0552` | 2.4 GHz dongle | headset's own percentage (`0x21`) + cable state (`0x2A`) |
+| HyperX Cloud II Wireless, Cloud Alpha Wireless, Cloud Flight Wireless | 2.4 GHz USB dongle | the headset's own percentage (Cloud II / Alpha) or a voltage-based estimate (Flight), plus the charging flag |
+| Other HyperX dongles (experimental) | 2.4 GHz USB dongle | tries the same vendor protocols; a device is shown only if the dongle answers. Some budget models (for example the Cloud Stinger Core Wireless) appear to be audio-only and cannot report a battery |
 | Xbox controllers (XInput) | wireless | coarse level (empty / low / medium / full → 5 / 20 / 60 / 100 %) |
 | Bluetooth devices with a Windows battery level | Bluetooth LE / classic | the level Windows itself exposes (headsets, earbuds, mice, keyboards) |
 
@@ -129,7 +131,7 @@ project (no system installation):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\toolchain.ps1
-powershell -ExecutionPolicy Bypass -File build.ps1 -Version 1.0.1
+powershell -ExecutionPolicy Bypass -File build.ps1 -Version 1.0.2
 powershell -ExecutionPolicy Bypass -File test.ps1
 ```
 
@@ -144,7 +146,7 @@ MinGW archive before extracting it.
 To build the installer you need [Inno Setup 6+](https://jrsoftware.org/isinfo.php):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1 -Version 1.0.1
+powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1 -Version 1.0.2
 ```
 
 The result is `dist\JuiceBar-<version>-setup.exe`.

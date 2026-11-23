@@ -4,6 +4,21 @@ All notable changes to JuiceBar are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] — 2026-11-23
+
+### Added
+
+- HyperX Cloud II Wireless, Cloud Alpha Wireless and Cloud Flight Wireless: battery level over the
+  USB dongle (the headset's own percentage for Cloud II / Alpha, a voltage-based estimate for the
+  Flight) and the charging flag.
+- An experimental probe for other HyperX dongles (HP `0x03f0`, Kingston `0x0951`): the common
+  vendor protocols are tried and a device is shown only when the dongle actually answers.
+
+### Notes
+
+- The Cloud Stinger Core Wireless looks audio-only; if its dongle does not answer the probe,
+  Windows and any app have no battery value to display.
+
 ## [1.0.1] — 2026-11-22
 
 ### Fixed

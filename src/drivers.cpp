@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <functional>
 #include <cwchar>
+#include <cmath>
 #include <map>
 #include <set>
 
@@ -521,11 +522,136 @@ void PollXInput(std::vector<Reading>& out) {
 
 } // namespace
 
+// ---------------------------------------------------------------- HyperX (Cloud series)
+
+constexpr uint16_t kHyperxVids[] = { 0x03F0, 0x0951 };   // HP/HyperX and Kingston
+
+struct HyperxModel {
+    uint16_t vid;
+    uint16_t pid;
+    const wchar_t* name;
+    int protocol;   // 1 Cloud II / 2 Cloud Alpha / 3 Cloud Flight
+};
+
+const HyperxModel kHyperx[] = {
+    { 0x03F0, 0x0696, L"HyperX Cloud II Wireless", 1 },
+    { 0x03F0, 0x018B, L"HyperX Cloud II Wireless", 1 },
+    { 0x03F0, 0x098D, L"HyperX Cloud Alpha Wireless", 2 },
+    { 0x0951, 0x16C4, L"HyperX Cloud Flight Wireless", 3 },
+    { 0x0951, 0x1723, L"HyperX Cloud Flight Wireless", 3 },
+};
+
+const HyperxModel* FindHyperx(uint16_t vid, uint16_t pid) {
+    for (const auto& m : kHyperx)
+        if (m.vid == vid && m.pid == pid) return &m;
+    return nullptr;
+}
+
+bool HyperxQuery(Hid& dev, const std::vector<BYTE>& request, std::vector<BYTE>& reply, int waitMs, int timeoutMs) {
+    dev.Flush();
+    if (!dev.WritePadded(request)) return false;
+    Sleep((DWORD)waitMs);
+    return dev.Read(reply, timeoutMs) > 0;
+}
+
+bool HyperxCloud2Battery(Hid& dev, int& percent, bool& charging) {
+    std::vector<BYTE> reply;
+    if (!HyperxQuery(dev, { 0x06, 0xFF, 0xBB, 0x02 }, reply, 100, 700)) return false;
+    if (reply.size() < 8 || reply[0] != 0x06 || reply[1] != 0xFF || reply[2] != 0xBB || reply[3] != 0x02)
+        return false;
+    if (reply[7] > 100) return false;
+    percent = reply[7];
+    charging = false;
+    if (HyperxQuery(dev, { 0x06, 0xFF, 0xBB, 0x03 }, reply, 100, 700) && reply.size() >= 5 &&
+        reply[0] == 0x06 && reply[1] == 0xFF && reply[2] == 0xBB && reply[3] == 0x03)
+        charging = reply[4] == 1;
+    return true;
+}
+
+bool HyperxAlphaBattery(Hid& dev, int& percent, bool& charging) {
+    std::vector<BYTE> reply;
+    if (!HyperxQuery(dev, { 0x21, 0xBB, 0x03 }, reply, 60, 700)) return false;
+    if (reply.size() < 4 || reply[3] == 1) return false;   // headset is off
+    charging = false;
+    if (HyperxQuery(dev, { 0x21, 0xBB, 0x0C }, reply, 60, 700) && reply.size() >= 4)
+        charging = reply[3] == 1;
+    if (!HyperxQuery(dev, { 0x21, 0xBB, 0x0B }, reply, 60, 700)) return false;
+    if (reply.size() < 4 || reply[3] > 100) return false;
+    percent = reply[3];
+    return true;
+}
+
+float HyperxVoltagePercent(uint16_t mv) {
+    if (mv <= 3648) return 0.00125f * mv;
+    if (mv > 3975) return 100.0f;
+    const double v = mv;
+    return (float)(0.00000002547505 * std::pow(v, 4) - 0.0003900299 * std::pow(v, 3) +
+                   2.238321 * std::pow(v, 2) - 5706.256 * v + 5452299.0);
+}
+
+bool HyperxFlightBattery(Hid& dev, int& percent, bool& charging) {
+    std::vector<BYTE> reply;
+    if (!HyperxQuery(dev, { 0x21, 0xFF, 0x05 }, reply, 60, 1600)) return false;
+    if (reply.size() != 15 && reply.size() != 20) return false;
+    const uint16_t mv = (uint16_t)((reply[3] << 8) | reply[4]);
+    charging = mv > 0x100B;
+    if (charging) {
+        percent = -1;
+        return true;
+    }
+    percent = (int)std::lroundf(HyperxVoltagePercent(mv));
+    percent = std::clamp(percent, 0, 100);
+    return true;
+}
+
+void PollHyperX(const std::vector<HidInterface>& hid, std::vector<Reading>& out) {
+    std::set<uint16_t> handled;
+    for (const auto& iface : hid) {
+        if (iface.vid != 0x03F0 && iface.vid != 0x0951) continue;
+        if (handled.count(iface.pid)) continue;
+        // Only a vendor collection can answer; the audio/consumer collections cannot.
+        if (iface.usagePage < 0xFF00 || iface.outLen < 4 || iface.inLen < 4) continue;
+
+        const HyperxModel* model = FindHyperx(iface.vid, iface.pid);
+        Hid dev;
+        if (!dev.Open(iface.path)) continue;
+
+        int percent = -1;
+        bool charging = false;
+        bool ok = false;
+        if (model) {
+            if (model->protocol == 1) ok = HyperxCloud2Battery(dev, percent, charging);
+            else if (model->protocol == 2) ok = HyperxAlphaBattery(dev, percent, charging);
+            else ok = HyperxFlightBattery(dev, percent, charging);
+        } else {
+            // Unknown HyperX model: try the common dongle protocols and accept the first valid reply.
+            if (iface.outLen >= 52 && iface.inLen >= 20) ok = HyperxCloud2Battery(dev, percent, charging);
+            if (!ok) ok = HyperxFlightBattery(dev, percent, charging);
+            if (!ok) ok = HyperxAlphaBattery(dev, percent, charging);
+        }
+        if (!ok) continue;
+        handled.insert(iface.pid);
+
+        Reading r;
+        r.id = Fmt(L"hyperx:%04X", iface.pid);
+        r.name = model ? model->name : (iface.product.empty() ? L"HyperX headset" : iface.product);
+        r.kind = Kind::Headset;
+        r.percent = (percent >= 0 && percent <= 100) ? percent : -1;
+        r.charging = charging;
+        r.full = charging && r.percent >= 100;
+        r.via = L"2.4 GHz";
+        r.driver = L"hyperx";
+        r.stamp = NowUnix();
+        out.push_back(std::move(r));
+    }
+}
+
 PollReport PollDevices() {
     PollReport report;
     std::vector<HidInterface> hid = EnumerateHid();
     PollSteelSeries(hid, report.devices, report.log);
     PollRazer(hid, report.devices, report.log);
+    PollHyperX(hid, report.devices);
     PollBluetooth(report.devices);
     PollXInput(report.devices);
 

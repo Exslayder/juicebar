@@ -34,6 +34,10 @@ does not use WebView2, Electron or any embedded browser.
   - https://github.com/nightdevx/barracuda-x-battery (MIT)
 - **Windows Bluetooth battery** — the device property `{104EA319-6EE2-4701-BD47-8DDBF425BBE5}, 2`
   that Windows itself maintains for headsets and LE devices.
+- **HyperX Cloud II / Alpha / Flight** — the vendor HID report layouts (HP `0x03f0`, Kingston
+  `0x0951`) as documented by the **HeadsetControl** project (GPL-3.0,
+  https://github.com/Sapd/HeadsetControl). The protocol facts were re-implemented for this code
+  base; no HeadsetControl code was copied.
 - **XInput** battery information via the documented `XInputGetBatteryInformation` API.
 
 ## Inspiration

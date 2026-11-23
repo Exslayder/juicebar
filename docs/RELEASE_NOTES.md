@@ -1,34 +1,32 @@
-# JuiceBar 1.0.1
+# JuiceBar 1.0.2
 
 Battery level **and remaining time** for wireless mice, headsets and controllers — right on the
 Windows taskbar, with no vendor software.
 
 ## Install
 
-Download `JuiceBar-1.0.1-setup.exe` and run it. The installer is per-user: no administrator
-rights, no UAC prompt. It installs to `%LOCALAPPDATA%\Programs\JuiceBar` by default (the wizard
-lets you choose another folder), adds a Start menu shortcut, and registers an uninstaller.
+Download `JuiceBar-1.0.2-setup.exe` and run it. Per-user installer: no administrator rights, no UAC
+prompt. By default it installs into `%LOCALAPPDATA%\Programs\JuiceBar` (the wizard lets you choose
+another folder), adds a Start menu shortcut and registers an uninstaller.
 
-## Fixed
+## New in this build
 
-- **Borderless fullscreen games.** The pill and the panel now hide when the foreground window
-  covers the monitor of the taskbar (and come back when you leave the game). Previously only
-  exclusive fullscreen was detected, so a borderless game left the pill floating over it.
-- **Empty devices for up to 80 seconds after a restart.** HID enumeration used to open every HID
-  device on the system; one sleeping Bluetooth interface could block it for over a minute, so the
-  first poll never completed and the panel said "no devices". Only known vendor IDs are opened now
-  (80 s → ~16 ms), and an empty poll is retried after 5 s instead of a full minute.
-- **Silent exit on startup.** A stale `ERROR_ALREADY_EXISTS` from an earlier API call could make
-  the single-instance check think another copy was running; the last error is cleared first now.
+- **HyperX support.** HyperX Cloud II Wireless, Cloud Alpha Wireless and Cloud Flight Wireless are
+  read over their USB dongle: the headset's own percentage for Cloud II / Alpha, a voltage-based
+  estimate for the Flight, plus the charging flag.
+- **Experimental HyperX probe.** Any other HyperX dongle (HP `0x03f0` or Kingston `0x0951`) that
+  exposes a vendor HID collection is queried with the common protocols; the device is shown only
+  when it actually answers. This is how we test models that are not on the known list yet —
+  including the Cloud Stinger Core Wireless.
+- Everything from 1.0.1: borderless-fullscreen hiding, fast startup enumeration, single-instance
+  fix, Material Symbols device glyphs, reproducible builds.
 
-## Changed
+## Honest note about the Cloud Stinger Core Wireless
 
-- **New device icons.** The pill and the panel use Material Symbols Rounded (Apache-2.0) for
-  mice, headphones, keyboards, gamepads, speakers and phones; battery marks stay Fluent.
-  Charging is still green, low battery red, a sleeping device dimmed.
-- README: status badges, repository topics, and the installer's folder choice documented.
-- The build is reproducible: the same commit produces a byte-identical `JuiceBar.exe`, and the
-  pinned MinGW archive is verified by SHA-256 before extraction.
+Its dongle appears to be an audio-only device (HyperX's own software does not recognize this
+model). If it has no vendor HID interface, there is no battery value in Windows for any app to
+show — not just JuiceBar. The probe above will tell us quickly: if the headset shows up with a
+percentage, it works; if not, the hardware does not report it.
 
 ## Requirements
 

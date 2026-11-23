@@ -51,7 +51,8 @@ std::vector<HidInterface> EnumerateHid(bool all) {
             // HID paths look like \\?\hid#vid_1038&pid_1838&mi_03&col01#...
             std::wstring lower = info.path;
             for (auto& ch2 : lower) ch2 = (wchar_t)towlower(ch2);
-            if (lower.find(L"vid_1038") == std::wstring::npos && lower.find(L"vid_1532") == std::wstring::npos)
+            if (lower.find(L"vid_1038") == std::wstring::npos && lower.find(L"vid_1532") == std::wstring::npos &&
+                lower.find(L"vid_03f0") == std::wstring::npos && lower.find(L"vid_0951") == std::wstring::npos)
                 continue;
         }
         info.mi = InterfaceNumberFromPath(info.path);
