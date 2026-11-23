@@ -39,7 +39,7 @@ measurement, and it is labelled while the data is still thin.
 
 ## Install
 
-Download `JuiceBar-1.0.3-setup.exe` from the latest release and run it. The installer is per-user — no
+Download `JuiceBar-1.0.4-setup.exe` from the latest release and run it. The installer is per-user — no
 administrator rights, no UAC prompt. By default it installs into
 `%LOCALAPPDATA%\Programs\JuiceBar` and adds a Start menu shortcut; the wizard also lets you pick
 another folder (for example `D:\Apps\JuiceBar`).
@@ -140,7 +140,7 @@ project (no system installation):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\toolchain.ps1
-powershell -ExecutionPolicy Bypass -File build.ps1 -Version 1.0.3
+powershell -ExecutionPolicy Bypass -File build.ps1 -Version 1.0.4
 powershell -ExecutionPolicy Bypass -File test.ps1
 ```
 
@@ -155,7 +155,7 @@ MinGW archive before extracting it.
 To build the installer you need [Inno Setup 6+](https://jrsoftware.org/isinfo.php):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1 -Version 1.0.3
+powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1 -Version 1.0.4
 ```
 
 The result is `dist\JuiceBar-<version>-setup.exe`.

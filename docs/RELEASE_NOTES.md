@@ -1,16 +1,19 @@
-# JuiceBar 1.0.3
+# JuiceBar 1.0.4
 
 Battery level **and remaining time** for wireless mice, headsets and controllers — right on the
 Windows taskbar, with no vendor software.
 
 ## Install
 
-Download `JuiceBar-1.0.3-setup.exe` and run it. Per-user installer: no administrator rights, no UAC
+Download `JuiceBar-1.0.4-setup.exe` and run it. Per-user installer: no administrator rights, no UAC
 prompt. By default it installs into `%LOCALAPPDATA%\Programs\JuiceBar` (the wizard lets you choose
 another folder), adds a Start menu shortcut and registers an uninstaller.
 
 ## Fixed in this build
 
+- **Windowed (fullscreen) games.** A maximized borderless window — WoW's *Windowed (Fullscreen)* is
+  one — is now detected by its client area instead of being rejected as a maximized document. The
+  pill hides for it and comes back on alt-tab; ordinary maximized documents still keep it visible.
 - **Calibration countdown.** While the forecast was learning, the panel showed a fixed "15 min"
   until the first fit was available. It now uses the observed sample span and the countdown
   decreases with every poll; a device with a single sample shows just "Calibrating" instead of a

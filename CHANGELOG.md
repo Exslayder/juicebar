@@ -4,6 +4,15 @@ All notable changes to JuiceBar are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.4] — 2026-11-23
+
+### Fixed
+
+- Windowed (fullscreen) games: a maximized borderless window (WoW's "Windowed (Fullscreen)" is
+  one) now hides the pill. The check compares the window's client area with the monitor instead of
+  rejecting every `IsZoomed` window, so an ordinary maximized document with a title bar still
+  keeps the pill visible.
+
 ## [1.0.3] — 2026-11-23
 
 ### Fixed

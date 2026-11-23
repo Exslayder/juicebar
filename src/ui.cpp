@@ -710,38 +710,70 @@ void TrackLeave(HWND wnd) {
 
 // Borderless ("fullscreen windowed") games cover the whole monitor, including the strip the
 // taskbar lives on, but Windows still reports a normal notification state. Detect the window
-// itself: if the foreground window covers the monitor of our taskbar, treat it as fullscreen.
+// itself: a borderless game covers the monitor with its client area, while a normal maximized
+// document has a caption and its client starts below the title bar, so a covering window rect
+// alone is not enough.
+bool CoversMonitor(const RECT& rect, const RECT& monitor) {
+    const LONG tolerance = 2;
+    return rect.left <= monitor.left + tolerance && rect.top <= monitor.top + tolerance &&
+           rect.right >= monitor.right - tolerance && rect.bottom >= monitor.bottom - tolerance;
+}
+
 bool ForegroundCoversTaskbar() {
     HWND foreground = GetForegroundWindow();
     if (!foreground) return false;
+    HWND root = GetAncestor(foreground, GA_ROOT);
+    if (!root) root = foreground;
 
     DWORD pid = 0;
-    GetWindowThreadProcessId(foreground, &pid);
+    GetWindowThreadProcessId(root, &pid);
     if (pid == GetCurrentProcessId()) return false;
+    if (!IsWindowVisible(root) || IsIconic(root)) return false;
 
     wchar_t cls[64] = {};
-    GetClassNameW(foreground, cls, 64);
+    GetClassNameW(root, cls, 64);
     if (!_wcsicmp(cls, L"Progman") || !_wcsicmp(cls, L"WorkerW") ||
         !_wcsicmp(cls, L"Shell_TrayWnd") || !_wcsicmp(cls, L"Shell_SecondaryTrayWnd"))
         return false;   // the desktop or the taskbar itself are never a game
 
-    // A maximized window is not a borderless fullscreen app. On Windows 10, with an auto-hidden
-    // taskbar, its rect covers the whole monitor, which used to make the pill hide for normal
-    // documents.
-    if (IsZoomed(foreground)) return false;
+    DWORD cloaked = 0;
+    if (SUCCEEDED(DwmGetWindowAttribute(root, DWMWA_CLOAKED, &cloaked, sizeof(cloaked))) && cloaked)
+        return false;   // a cloaked UWP window is not on screen
 
     HWND taskbar = FindWindowW(L"Shell_TrayWnd", nullptr);
     if (!taskbar) return false;
     HMONITOR monitor = MonitorFromWindow(taskbar, MONITOR_DEFAULTTONEAREST);
     MONITORINFO info{ sizeof(info) };
     if (!GetMonitorInfoW(monitor, &info)) return false;
+    const RECT& screen = info.rcMonitor;
 
     RECT window{};
-    if (!GetWindowRect(foreground, &window)) return false;
-    const RECT& screen = info.rcMonitor;
-    const LONG tolerance = 2;
-    return window.left <= screen.left + tolerance && window.top <= screen.top + tolerance &&
-           window.right >= screen.right - tolerance && window.bottom >= screen.bottom - tolerance;
+    if (!GetWindowRect(root, &window)) return false;
+
+    RECT client{};
+    POINT origin{ 0, 0 };
+    RECT clientScreen{};
+    const bool haveClient = GetClientRect(root, &client) && ClientToScreen(root, &origin);
+    if (haveClient) {
+        clientScreen = { origin.x, origin.y, origin.x + client.right, origin.y + client.bottom };
+        if (CoversMonitor(clientScreen, screen)) return true;
+    }
+
+    if (!CoversMonitor(window, screen)) return false;
+    // Do not reject IsZoomed windows outright: WoW's "Windowed (Fullscreen)" is a maximized
+    // borderless window. The client-area check above and the missing caption below separate it
+    // from an ordinary maximized document.
+    const LONG style = GetWindowLongW(root, GWL_STYLE);
+    if ((style & WS_CAPTION) != WS_CAPTION) return true;   // borderless
+    if (!IsZoomed(root)) return true;                       // manually sized to the monitor
+    // A maximized window with a caption is normally a document. Accept it only when the client
+    // area really starts at the top of the DWM frame (no visible title bar).
+    RECT frame{};
+    if (haveClient &&
+        SUCCEEDED(DwmGetWindowAttribute(root, DWMWA_EXTENDED_FRAME_BOUNDS, &frame, sizeof(frame))) &&
+        clientScreen.top - frame.top <= 2)
+        return true;
+    return false;
 }
 
 bool FullscreenApp() {
@@ -759,25 +791,51 @@ std::wstring FullscreenReportImpl() {
     QUERY_USER_NOTIFICATION_STATE state{};
     const HRESULT hr = SHQueryUserNotificationState(&state);
     HWND fg = GetForegroundWindow();
-    std::wstring cls;
-    RECT r{};
-    bool zoomed = false;
-    if (fg) {
-        wchar_t buf[128] = {};
-        GetClassNameW(fg, buf, 128);
-        cls = buf;
-        GetWindowRect(fg, &r);
-        zoomed = IsZoomed(fg) != FALSE;
+    HWND root = fg ? GetAncestor(fg, GA_ROOT) : nullptr;
+
+    std::wstring out = Fmt(L"QUNS=%d (hr=0x%08X)\n", (int)state, (unsigned)hr);
+    if (!root) {
+        out += L"no foreground window\n";
+        out += Fmt(L"covers=0 fullscreen=%d\n", FullscreenApp() ? 1 : 0);
+        return out;
     }
+
+    wchar_t cls[128] = {};
+    GetClassNameW(root, cls, 128);
+    DWORD pid = 0;
+    GetWindowThreadProcessId(root, &pid);
+    DWORD cloaked = 0;
+    DwmGetWindowAttribute(root, DWMWA_CLOAKED, &cloaked, sizeof(cloaked));
+    RECT wr{}, cr{}, frame{};
+    POINT origin{};
+    GetWindowRect(root, &wr);
+    GetClientRect(root, &cr);
+    ClientToScreen(root, &origin);
+    DwmGetWindowAttribute(root, DWMWA_EXTENDED_FRAME_BOUNDS, &frame, sizeof(frame));
+
     HWND bar = FindWindowW(L"Shell_TrayWnd", nullptr);
-    RECT barRect{};
-    if (bar) GetWindowRect(bar, &barRect);
-    return Fmt(L"QUNS=%d (hr=0x%08X)\n"
-               L"foreground=%s rect=%ld,%ld,%ld,%ld zoomed=%d\n"
-               L"taskbar rect=%ld,%ld,%ld,%ld covers=%d fullscreen=%d\n",
-               (int)state, (unsigned)hr, cls.c_str(), r.left, r.top, r.right, r.bottom,
-               zoomed ? 1 : 0, barRect.left, barRect.top, barRect.right, barRect.bottom,
-               ForegroundCoversTaskbar() ? 1 : 0, FullscreenApp() ? 1 : 0);
+    RECT barRect{}, monRect{};
+    if (bar) {
+        GetWindowRect(bar, &barRect);
+        HMONITOR mon = MonitorFromWindow(bar, MONITOR_DEFAULTTONEAREST);
+        MONITORINFO mi{ sizeof(mi) };
+        if (GetMonitorInfoW(mon, &mi)) monRect = mi.rcMonitor;
+    }
+
+    out += Fmt(L"class=%s pid=%lu style=0x%08lX ex=0x%08lX zoomed=%d visible=%d iconic=%d cloaked=%lu\n",
+               cls, (unsigned long)pid, (unsigned long)GetWindowLongW(root, GWL_STYLE),
+               (unsigned long)GetWindowLongW(root, GWL_EXSTYLE), IsZoomed(root) ? 1 : 0,
+               IsWindowVisible(root) ? 1 : 0, IsIconic(root) ? 1 : 0, (unsigned long)cloaked);
+    out += Fmt(L"window=%ld,%ld,%ld,%ld client=%ld,%ld,%ld,%ld frame=%ld,%ld,%ld,%ld\n",
+               wr.left, wr.top, wr.right, wr.bottom,
+               origin.x, origin.y, origin.x + cr.right, origin.y + cr.bottom,
+               frame.left, frame.top, frame.right, frame.bottom);
+    out += Fmt(L"monitor=%ld,%ld,%ld,%ld taskbar=%ld,%ld,%ld,%ld\n",
+               monRect.left, monRect.top, monRect.right, monRect.bottom,
+               barRect.left, barRect.top, barRect.right, barRect.bottom);
+    out += Fmt(L"covers=%d fullscreen=%d\n", ForegroundCoversTaskbar() ? 1 : 0,
+               FullscreenApp() ? 1 : 0);
+    return out;
 }
 
 void Animate() {
