@@ -14,19 +14,20 @@ another folder), adds a Start menu shortcut and registers an uninstaller.
 - **HyperX support.** HyperX Cloud II Wireless, Cloud Alpha Wireless and Cloud Flight Wireless are
   read over their USB dongle: the headset's own percentage for Cloud II / Alpha, a voltage-based
   estimate for the Flight, plus the charging flag.
+- **Cloud Stinger Core Wireless + 7.1** (`0951:170B`): the dongle's feature-report protocol is
+  implemented too (connection check, charge code, voltage curves), so this model now reports its
+  level and charging state.
 - **Experimental HyperX probe.** Any other HyperX dongle (HP `0x03f0` or Kingston `0x0951`) that
   exposes a vendor HID collection is queried with the common protocols; the device is shown only
-  when it actually answers. This is how we test models that are not on the known list yet —
-  including the Cloud Stinger Core Wireless.
+  when it actually answers. This is how models that are not on the known list get a chance to work
+  without a new build.
 - Everything from 1.0.1: borderless-fullscreen hiding, fast startup enumeration, single-instance
   fix, Material Symbols device glyphs, reproducible builds.
 
-## Honest note about the Cloud Stinger Core Wireless
+## Note about the Cloud Stinger Core Wireless
 
-Its dongle appears to be an audio-only device (HyperX's own software does not recognize this
-model). If it has no vendor HID interface, there is no battery value in Windows for any app to
-show — not just JuiceBar. The probe above will tell us quickly: if the headset shows up with a
-percentage, it works; if not, the hardware does not report it.
+The dongle only answers while the headset is switched on. With the headset off, no level is
+available; JuiceBar keeps the last known value dimmed for five minutes and then hides the device.
 
 ## Requirements
 

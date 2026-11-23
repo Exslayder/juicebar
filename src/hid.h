@@ -34,6 +34,9 @@ public:
     // Returns bytes read (>0), 0 on timeout, -1 on error. Also returns the timeout error as 0.
     int Read(std::vector<BYTE>& out, int timeoutMs);
     bool GetInputReport(BYTE reportId, std::vector<BYTE>& buf);
+    // Feature reports (control transfers); the report ID is byte 0 of `data`/`buf`.
+    bool SetFeature(const std::vector<BYTE>& data);
+    bool GetFeature(BYTE reportId, std::vector<BYTE>& buf);
     void Flush();
 
     int inLen() const { return inLen_; }
@@ -42,7 +45,7 @@ public:
 private:
     HANDLE handle_ = INVALID_HANDLE_VALUE;
     HANDLE event_ = nullptr;
-    int inLen_ = 0, outLen_ = 0;
+    int inLen_ = 0, outLen_ = 0, featureLen_ = 0;
     bool Io(std::vector<BYTE>& buf, DWORD bytes, bool isWrite, int timeoutMs);
 };
 

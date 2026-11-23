@@ -38,6 +38,9 @@ does not use WebView2, Electron or any embedded browser.
   `0x0951`) as documented by the **HeadsetControl** project (GPL-3.0,
   https://github.com/Sapd/HeadsetControl). The protocol facts were re-implemented for this code
   base; no HeadsetControl code was copied.
+- **HyperX Cloud Stinger Core Wireless + 7.1** (`0951:170B`) — the feature-report connection and
+  battery queries, charge codes and voltage curves from **HyperBatteryMonitor** (MIT,
+  https://github.com/davidsantanaalves/HyperBatteryMonitor), re-implemented for this code base.
 - **XInput** battery information via the documented `XInputGetBatteryInformation` API.
 
 ## Inspiration

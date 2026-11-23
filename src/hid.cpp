@@ -114,6 +114,7 @@ bool Hid::Open(const std::wstring& path) {
         if (HidP_GetCaps(pp, &caps) == HIDP_STATUS_SUCCESS) {
             inLen_ = caps.InputReportByteLength;
             outLen_ = caps.OutputReportByteLength;
+            featureLen_ = caps.FeatureReportByteLength;
         }
         HidD_FreePreparsedData(pp);
     }
@@ -133,7 +134,7 @@ void Hid::Close() {
         CloseHandle(event_);
         event_ = nullptr;
     }
-    inLen_ = outLen_ = 0;
+    inLen_ = outLen_ = featureLen_ = 0;
 }
 
 bool Hid::Io(std::vector<BYTE>& buf, DWORD bytes, bool isWrite, int timeoutMs) {
@@ -174,6 +175,21 @@ int Hid::Read(std::vector<BYTE>& out, int timeoutMs) {
     if (!Io(buf, (DWORD)buf.size(), false, timeoutMs)) return 0;
     out = std::move(buf);
     return (int)out.size();
+}
+
+bool Hid::SetFeature(const std::vector<BYTE>& data) {
+    if (!ok() || featureLen_ <= 0) return false;
+    if (data.empty() || data.size() > (size_t)featureLen_) return false;
+    std::vector<BYTE> buf((size_t)featureLen_, 0);
+    memcpy(buf.data(), data.data(), data.size());
+    return HidD_SetFeature(handle_, buf.data(), (ULONG)buf.size()) != FALSE;
+}
+
+bool Hid::GetFeature(BYTE reportId, std::vector<BYTE>& buf) {
+    if (!ok() || featureLen_ <= 0) return false;
+    buf.assign((size_t)featureLen_, 0);
+    buf[0] = reportId;
+    return HidD_GetFeature(handle_, buf.data(), (ULONG)buf.size()) != FALSE;
 }
 
 bool Hid::GetInputReport(BYTE reportId, std::vector<BYTE>& buf) {

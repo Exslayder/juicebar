@@ -11,13 +11,15 @@ All notable changes to JuiceBar are documented here. The format follows
 - HyperX Cloud II Wireless, Cloud Alpha Wireless and Cloud Flight Wireless: battery level over the
   USB dongle (the headset's own percentage for Cloud II / Alpha, a voltage-based estimate for the
   Flight) and the charging flag.
+- HyperX Cloud Stinger Core Wireless + 7.1 (`0951:170B`): feature-report connection and battery
+  queries, charge code and voltage curves, with the charging flag.
 - An experimental probe for other HyperX dongles (HP `0x03f0`, Kingston `0x0951`): the common
   vendor protocols are tried and a device is shown only when the dongle actually answers.
 
 ### Notes
 
-- The Cloud Stinger Core Wireless looks audio-only; if its dongle does not answer the probe,
-  Windows and any app have no battery value to display.
+- The Stinger Core dongle only answers while the headset is powered on; when it is off, JuiceBar
+  keeps showing the last level until the device disappears.
 
 ## [1.0.1] — 2026-11-22
 

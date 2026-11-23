@@ -55,7 +55,8 @@ install folder. Your settings and history are kept; delete `%APPDATA%\JuiceBar` 
 | SteelSeries Aerox 3 / 3 Gen 2 / 5 / 9 Wireless, Prime Wireless, CS2 and Diablo IV editions | 2.4 GHz receiver or USB cable | firmware battery step (0–100 % in 5 % steps; Gen 2 in 1 % steps) + charging flag |
 | Razer Barracuda X (2022), PIDs `1532:0550` / `1532:0552` | 2.4 GHz dongle | headset's own percentage (`0x21`) + cable state (`0x2A`) |
 | HyperX Cloud II Wireless, Cloud Alpha Wireless, Cloud Flight Wireless | 2.4 GHz USB dongle | the headset's own percentage (Cloud II / Alpha) or a voltage-based estimate (Flight), plus the charging flag |
-| Other HyperX dongles (experimental) | 2.4 GHz USB dongle | tries the same vendor protocols; a device is shown only if the dongle answers. Some budget models (for example the Cloud Stinger Core Wireless) appear to be audio-only and cannot report a battery |
+| HyperX Cloud Stinger Core Wireless + 7.1 (`0951:170B`) | 2.4 GHz USB dongle | feature-report charge code + voltage estimate (charging / discharging curves) |
+| Other HyperX dongles (experimental) | 2.4 GHz USB dongle | tries the same vendor protocols (including the feature-report one); a device is shown only if the dongle answers |
 | Xbox controllers (XInput) | wireless | coarse level (empty / low / medium / full → 5 / 20 / 60 / 100 %) |
 | Bluetooth devices with a Windows battery level | Bluetooth LE / classic | the level Windows itself exposes (headsets, earbuds, mice, keyboards) |
 

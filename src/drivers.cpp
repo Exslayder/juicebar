@@ -539,6 +539,7 @@ const HyperxModel kHyperx[] = {
     { 0x03F0, 0x098D, L"HyperX Cloud Alpha Wireless", 2 },
     { 0x0951, 0x16C4, L"HyperX Cloud Flight Wireless", 3 },
     { 0x0951, 0x1723, L"HyperX Cloud Flight Wireless", 3 },
+    { 0x0951, 0x170B, L"HyperX Cloud Stinger Core Wireless + 7.1", 4 },
 };
 
 const HyperxModel* FindHyperx(uint16_t vid, uint16_t pid) {
@@ -604,13 +605,65 @@ bool HyperxFlightBattery(Hid& dev, int& percent, bool& charging) {
     return true;
 }
 
+
+// The Stinger Core dongle answers feature reports (report ID 0xFF): a connection query, then a
+// battery query returning a charge code and a little-endian millivolt value.
+bool HyperxFeatureExchange(Hid& dev, const std::vector<BYTE>& command, std::vector<BYTE>& reply) {
+    if (!dev.SetFeature(command)) return false;
+    Sleep(20);
+    return dev.GetFeature(0xFF, reply);
+}
+
+int HyperxStingerPercent(int millivolts, BYTE charge) {
+    if (charge == 6) return 100;
+    static const float charging[] = { 3.4000f, 3.8309f, 3.8707f, 3.9162f, 3.9299f, 3.9456f,
+                                      3.9674f, 4.0000f, 4.0497f, 4.0900f, 4.1300f };
+    static const float discharging[] = { 3.5174f, 3.6508f, 3.6998f, 3.7381f, 3.7633f, 3.7847f,
+                                         3.8381f, 3.9052f, 3.9542f, 4.0423f, 4.1205f };
+    const float* knots = (charge == 5) ? charging : discharging;
+    const float volts = millivolts / 1000.0f;
+    if (volts >= knots[10]) return 100;
+    for (int i = 0; i < 10; i++) {
+        if (volts >= knots[i] && volts <= knots[i + 1]) {
+            const float t = (volts - knots[i]) / (knots[i + 1] - knots[i]);
+            return i * 10 + (int)std::floor(t * 10);
+        }
+    }
+    return 0;
+}
+
+bool HyperxStingerBattery(Hid& dev, int& percent, bool& charging) {
+    static const BYTE connection[] = { 0xFF, 0x07, 0x00, 0xFD, 0x04, 0x00, 0x00, 0x02, 0x82, 0x03,
+                                       0x05, 0x29, 0x0F, 0x00, 0x00, 0x03, 0x68, 0x10, 0x00, 0x00 };
+    static const BYTE battery[] = { 0xFF, 0x07, 0x00, 0xFD, 0x04, 0x0C, 0xF1, 0x02, 0x01, 0x04,
+                                    0xF0, 0x0C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                    0x00, 0x00 };
+    std::vector<BYTE> reply;
+    if (!HyperxFeatureExchange(dev, std::vector<BYTE>(connection, connection + sizeof(connection)), reply))
+        return false;
+    if (reply.size() <= 11 || reply[11] != 1) return false;   // headset is off
+
+    if (!HyperxFeatureExchange(dev, std::vector<BYTE>(battery, battery + sizeof(battery)), reply))
+        return false;
+    if (reply.size() < 13) return false;
+    const BYTE charge = reply[9];
+    if (charge != 3 && charge != 5 && charge != 6) return false;
+
+    const int millivolts = (int)(int16_t)(reply[11] | (reply[12] << 8));
+    charging = (charge == 5 || charge == 6);
+    percent = HyperxStingerPercent(millivolts, charge);
+    return true;
+}
+
 void PollHyperX(const std::vector<HidInterface>& hid, std::vector<Reading>& out) {
     std::set<uint16_t> handled;
     for (const auto& iface : hid) {
         if (iface.vid != 0x03F0 && iface.vid != 0x0951) continue;
         if (handled.count(iface.pid)) continue;
         // Only a vendor collection can answer; the audio/consumer collections cannot.
-        if (iface.usagePage < 0xFF00 || iface.outLen < 4 || iface.inLen < 4) continue;
+        if (iface.usagePage < 0xFF00 || ((iface.outLen < 4 || iface.inLen < 4) && iface.featLen < 20))
+            continue;
 
         const HyperxModel* model = FindHyperx(iface.vid, iface.pid);
         Hid dev;
@@ -622,14 +675,32 @@ void PollHyperX(const std::vector<HidInterface>& hid, std::vector<Reading>& out)
         if (model) {
             if (model->protocol == 1) ok = HyperxCloud2Battery(dev, percent, charging);
             else if (model->protocol == 2) ok = HyperxAlphaBattery(dev, percent, charging);
+            else if (model->protocol == 4) ok = HyperxStingerBattery(dev, percent, charging);
             else ok = HyperxFlightBattery(dev, percent, charging);
         } else {
             // Unknown HyperX model: try the common dongle protocols and accept the first valid reply.
             if (iface.outLen >= 52 && iface.inLen >= 20) ok = HyperxCloud2Battery(dev, percent, charging);
             if (!ok) ok = HyperxFlightBattery(dev, percent, charging);
             if (!ok) ok = HyperxAlphaBattery(dev, percent, charging);
+            if (!ok && iface.featLen >= 20) ok = HyperxStingerBattery(dev, percent, charging);
         }
-        if (!ok) continue;
+        if (!ok) {
+            // A known dongle with the headset switched off: keep it visible, dimmed, like the
+            // SteelSeries/Razer receivers. Unknown models are not shown on a failed probe.
+            if (model) {
+                Reading asleep;
+                asleep.id = Fmt(L"hyperx:%04X", iface.pid);
+                asleep.name = model->name;
+                asleep.kind = Kind::Headset;
+                asleep.asleep = true;
+                asleep.via = L"2.4 GHz";
+                asleep.driver = L"hyperx";
+                asleep.stamp = NowUnix();
+                out.push_back(std::move(asleep));
+                handled.insert(iface.pid);
+            }
+            continue;
+        }
         handled.insert(iface.pid);
 
         Reading r;
