@@ -52,7 +52,8 @@ std::vector<HidInterface> EnumerateHid(bool all) {
             std::wstring lower = info.path;
             for (auto& ch2 : lower) ch2 = (wchar_t)towlower(ch2);
             if (lower.find(L"vid_1038") == std::wstring::npos && lower.find(L"vid_1532") == std::wstring::npos &&
-                lower.find(L"vid_03f0") == std::wstring::npos && lower.find(L"vid_0951") == std::wstring::npos)
+                lower.find(L"vid_03f0") == std::wstring::npos && lower.find(L"vid_0951") == std::wstring::npos &&
+                lower.find(L"vid_054c") == std::wstring::npos)
                 continue;
         }
         info.mi = InterfaceNumberFromPath(info.path);
@@ -118,7 +119,9 @@ bool Hid::Open(const std::wstring& path) {
         }
         HidD_FreePreparsedData(pp);
     }
-    if (!inLen_ || !outLen_) {
+    // A collection may be input-only (the PULSE 3D status collection only needs reads); writes then
+    // fail in WritePadded instead of refusing to open.
+    if (!inLen_) {
         Close();
         return false;
     }

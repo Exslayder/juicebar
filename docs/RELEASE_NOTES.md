@@ -17,6 +17,9 @@ another folder), adds a Start menu shortcut and registers an uninstaller.
 - **Cloud Stinger Core Wireless + 7.1** (`0951:170B`): the dongle's feature-report protocol is
   implemented too (connection check, charge code, voltage curves), so this model now reports its
   level and charging state.
+- **Sony PULSE 3D** (`054C:0D5E`): the 2.4 GHz dongle pushes status reports with the level (10 %
+  steps), the charging state and the connection flag. The handle stays open between polls so a
+  report that arrives while the app is idle is not lost.
 - **Above the clock, never over the taskbar.** The pill floats just above the clock. Its right
   edge stays in place and it grows left as devices connect, so taskbar buttons, toolbars and the
   news widget stay uncovered; the panel opens above it.
@@ -35,6 +38,13 @@ another folder), adds a Start menu shortcut and registers an uninstaller.
 
 The dongle only answers while the headset is switched on. With the headset off, no level is
 available; JuiceBar keeps the last known value dimmed for five minutes and then hides the device.
+
+## Note about the PULSE 3D
+
+The dongle only reports on change: power on/off, a button press, the charge cable, or a 10 % battery
+step (roughly once an hour). Right after a start the first status may therefore need a volume-button
+press on the headset. While charging the dongle withholds the level, so JuiceBar shows the last known
+percentage with the green charging mark.
 
 ## Requirements
 

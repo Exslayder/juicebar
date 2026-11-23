@@ -520,6 +520,91 @@ void PollXInput(std::vector<Reading>& out) {
     FreeLibrary(dll);
 }
 
+// ---------------------------------------------------------------- Sony PULSE 3D
+
+// The PULSE 3D dongle (054C:0D5E) never answers queries. It pushes an 8-byte status report
+// (ID 0xB0) only when something changes: power on/off, a button, the charge cable, or a battery
+// step (roughly once an hour, in 10% steps). The handle therefore stays open between polls so
+// those reports queue in the OS buffer instead of being lost while the device is closed.
+struct SonyPulse {
+    Hid dev;
+    std::wstring path;
+    bool haveStatus = false;
+    bool connected = false;
+    bool charging = false;
+    int percent = -1;   // not reported while charging
+};
+
+SonyPulse& SonyPulseStatus() {
+    static SonyPulse status;
+    return status;
+}
+
+void PollSony(const std::vector<HidInterface>& hid, std::vector<Reading>& out, std::wstring& log) {
+    SonyPulse& status = SonyPulseStatus();
+    const HidInterface* iface = nullptr;
+    for (const auto& i : hid) {
+        // The status lives on the vendor collection, not on the media-key collections.
+        if (i.vid == 0x054C && i.pid == 0x0D5E && i.usagePage == 0xFF01 && i.usage == 0x0020) {
+            iface = &i;
+            break;
+        }
+    }
+    if (!iface) {
+        status.dev.Close();
+        status.path.clear();
+        status.haveStatus = false;
+        return;
+    }
+
+    if (!status.dev.ok() || status.path != iface->path) {
+        status.dev.Close();
+        if (!status.dev.Open(iface->path)) {
+            log += L"Sony: the PULSE 3D dongle is present but its status interface cannot be opened\n";
+            status.path.clear();
+            status.haveStatus = false;
+            return;
+        }
+        status.path = iface->path;
+        status.haveStatus = false;
+        status.connected = false;
+        status.charging = false;
+        status.percent = -1;
+    }
+
+    // Drain what the dongle queued since the last poll. Interface 3 also carries media-key
+    // reports, which use other report IDs; the cap guards against a report flood.
+    std::vector<BYTE> report;
+    for (int i = 0; i < 64; i++) {
+        if (status.dev.Read(report, 15) <= 0) break;
+        if (report.size() < 8 || report[0] != 0xB0) continue;
+        status.haveStatus = true;
+        status.connected = (report[4] & 0x08) != 0;
+        if (report[3] == 0x80) {
+            status.charging = true;   // on the cable; the level is withheld meanwhile
+        } else if (report[3] <= 100) {
+            status.charging = false;
+            status.percent = report[3];
+        }
+    }
+
+    // Reports only arrive on change, so a fresh session may wait a while for the first one.
+    // Until then (and while the headset is off) keep the device out of the list.
+    if (!status.haveStatus || !status.connected) return;
+
+    Reading r;
+    r.id = L"sony:pulse3d";
+    r.name = L"Sony PULSE 3D";
+    r.kind = Kind::Headset;
+    r.percent = status.percent;
+    r.charging = status.charging;
+    r.full = status.charging && status.percent >= 100;
+    r.via = Via2G;
+    r.driver = L"sony";
+    r.stamp = NowUnix();
+    out.push_back(std::move(r));
+}
+
 } // namespace
 
 // ---------------------------------------------------------------- HyperX (Cloud series)
@@ -721,6 +806,7 @@ PollReport PollDevices() {
     PollSteelSeries(hid, report.devices, report.log);
     PollRazer(hid, report.devices, report.log);
     PollHyperX(hid, report.devices);
+    PollSony(hid, report.devices, report.log);
     PollBluetooth(report.devices);
     PollXInput(report.devices);
 

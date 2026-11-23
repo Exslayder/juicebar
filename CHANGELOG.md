@@ -15,23 +15,8 @@ All notable changes to JuiceBar are documented here. The format follows
   queries, charge code and voltage curves, with the charging flag.
 - An experimental probe for other HyperX dongles (HP `0x03f0`, Kingston `0x0951`): the common
   vendor protocols are tried and a device is shown only when the dongle actually answers.
-
-### Notes
-
-- The Stinger Core dongle only answers while the headset is powered on; when it is off, JuiceBar
-  keeps showing the last level until the device disappears.
-
-## [1.0.1] — 2026-11-22
-
-### Fixed
-
-- The pill and panel now hide for borderless fullscreen games (any foreground window covering the
-  monitor of the taskbar), not only for exclusive fullscreen.
-- Startup could show "no devices" for up to 80 seconds: HID enumeration opened every device on the
-  system and one sleeping Bluetooth interface blocked it. Only known vendor IDs are opened now
-  (80 s → ~16 ms), and an empty poll is retried after 5 s.
-- A stale `ERROR_ALREADY_EXISTS` could make the single-instance check exit the app silently; the
-  last error is cleared before `CreateMutex`.
+- Sony PULSE 3D (`054C:0D5E`): the dongle pushes status reports with the battery level (10 %
+  steps) and the connection state; the handle is kept open between polls so no report is lost.
 
 ### Fixed
 
@@ -46,6 +31,28 @@ All notable changes to JuiceBar are documented here. The format follows
   (the classic position left of the tray).
 - The pill now floats just above the clock, right-aligned; it grows to the left as devices connect,
   so it never covers taskbar buttons, toolbars or the news widget. The panel opens above the pill.
+
+### Notes
+
+- The Stinger Core dongle only answers while the headset is powered on; when it is off, JuiceBar
+  keeps showing the last level until the device disappears.
+- The PULSE 3D dongle only reports on change (power, a button, the cable, a 10 % step). Right after
+  a start the first status may need a volume-button press on the headset.
+
+## [1.0.1] — 2026-11-22
+
+### Fixed
+
+- The pill and panel now hide for borderless fullscreen games (any foreground window covering the
+  monitor of the taskbar), not only for exclusive fullscreen.
+- Startup could show "no devices" for up to 80 seconds: HID enumeration opened every device on the
+  system and one sleeping Bluetooth interface blocked it. Only known vendor IDs are opened now
+  (80 s → ~16 ms), and an empty poll is retried after 5 s.
+- A stale `ERROR_ALREADY_EXISTS` could make the single-instance check exit the app silently; the
+  last error is cleared before `CreateMutex`.
+
+### Changed
+
 - Device glyphs are Material Symbols Rounded (Apache-2.0) in the pill and the panel; battery marks
   stay Fluent. Charging is green, low battery red, sleeping devices dimmed.
 - README badges and repository topics; the installer's folder choice is documented.

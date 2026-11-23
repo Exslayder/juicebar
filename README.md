@@ -59,6 +59,7 @@ install folder. Your settings and history are kept; delete `%APPDATA%\JuiceBar` 
 | HyperX Cloud II Wireless, Cloud Alpha Wireless, Cloud Flight Wireless | 2.4 GHz USB dongle | the headset's own percentage (Cloud II / Alpha) or a voltage-based estimate (Flight), plus the charging flag |
 | HyperX Cloud Stinger Core Wireless + 7.1 (`0951:170B`) | 2.4 GHz USB dongle | feature-report charge code + voltage estimate (charging / discharging curves) |
 | Other HyperX dongles (experimental) | 2.4 GHz USB dongle | tries the same vendor protocols (including the feature-report one); a device is shown only if the dongle answers |
+| Sony PULSE 3D (`054C:0D5E`) | 2.4 GHz USB dongle | pushed status reports: level in 10 % steps, charging state and connection flag (the dongle answers no queries) |
 | Xbox controllers (XInput) | wireless | coarse level (empty / low / medium / full → 5 / 20 / 60 / 100 %) |
 | Bluetooth devices with a Windows battery level | Bluetooth LE / classic | the level Windows itself exposes (headsets, earbuds, mice, keyboards) |
 
