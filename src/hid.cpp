@@ -84,8 +84,6 @@ std::vector<HidInterface> EnumerateHid(bool all) {
 
         wchar_t buf[512];
         if (HidD_GetProductString(h, buf, sizeof(buf)) && buf[0]) info.product = FromWideBuffer(buf, 512);
-        if (HidD_GetManufacturerString(h, buf, sizeof(buf)) && buf[0]) info.manufacturer = FromWideBuffer(buf, 512);
-        if (HidD_GetSerialNumberString(h, buf, sizeof(buf)) && buf[0]) info.serial = FromWideBuffer(buf, 512);
         CloseHandle(h);
 
         if (!info.vid) continue;

@@ -11,9 +11,10 @@ Windows taskbar, without vendor software.
 
 ![JuiceBar panel](docs/screenshot.png)
 
-A small pill sits next to the notification area and shows the real level reported by each device.
-Click it and a compact panel opens with the device name, the estimated time left, the percentage
-and a battery glyph. It closes as soon as the pointer leaves it (or on a second click on the pill).
+A small pill floats above the clock (or sits on the taskbar, if you prefer) and shows the real level
+reported by each device. Click it and a compact panel opens with the device name, the estimated time
+left, the percentage and a battery glyph. It closes 200 ms after the pointer leaves it (or on a
+second click on the pill).
 
 ## Why another battery monitor
 
@@ -28,7 +29,7 @@ measurement, and it is labelled while the data is still thin.
   `≈ 3 h 20 min`. Nothing is uploaded and no account is needed.
 - **All native, no Chromium.** ~1.8 MB exe: the pill, the panel, device polling and history are
   plain Win32 + GDI+. No WebView2, no Electron, no background Chromium processes. Idle CPU is
-  0 ms/s and the working set is ~24 MB.
+  0 ms/s and the working set is under 25 MB.
 - **Sits above the clock.** The pill floats just above the clock and grows to the left as devices
   connect, so it never covers taskbar buttons, toolbars or widgets.
 - **Starts with Windows.** Enabled on the first run; a checkbox in the right-click menu turns it
@@ -72,8 +73,8 @@ no number to read.
 - A percentage is only shown when the device actually reports one (`0…100`). Out-of-range values
   are rejected instead of clamped silently.
 - A device that stops answering keeps its last value, dimmed, with "no answer" — the last sample is
-  never presented as fresh. It disappears from the panel five minutes after it went away (or when
-  its receiver is unplugged).
+  never presented as fresh. A Bluetooth device that disconnects disappears after five minutes; a
+  receiver that stays plugged in keeps its headset on screen as "off" (dimmed) with the last level.
 - SteelSeries reports steps, so 45 % means "45 %"; Razer reports its own number; Xbox levels are
   coarse by nature and shown as such.
 - Verified twice against the reference protocol reader (BatteryHub) with both tools running at the
@@ -95,7 +96,9 @@ sessions break the window).
 
 ## Polling
 
-- Devices are read once every **60 seconds** by a single background thread.
+- Devices are polled once every **60 seconds** by a background thread. The Sony PULSE 3D is the
+  exception: its dongle only pushes reports, so a second thread blocks on them and wakes the poller
+  when something changes.
 - An extra read happens immediately on start, on a device connect/disconnect (`WM_DEVICECHANGE`),
   after resume from sleep, and from *Refresh* in the menu.
 - History keeps at most one sample per device per minute and is written to disk every 5 minutes
@@ -107,6 +110,7 @@ Right-click the pill:
 
 - **Refresh** — poll the devices right now.
 - **Start with Windows** — checked by default; toggles the `HKCU\…\Run` entry.
+- **Placement** — *Above the clock* (default) or *On the taskbar*.
 - **Exit**.
 
 ## Command line
@@ -118,7 +122,7 @@ JuiceBar.exe --dump          list HID collections (for adding new devices)
 JuiceBar.exe --fonts         report which UI fonts were resolved
 JuiceBar.exe --fullscreen    report the fullscreen detection and exit
 JuiceBar.exe --panel         start with the panel open
-JuiceBar.exe --no-pill       hide the taskbar pill
+JuiceBar.exe --no-pill       hide the taskbar pill for this run
 JuiceBar.exe --data <dir>    keep settings and history in <dir> (portable)
 JuiceBar.exe --quit          close the running instance
 ```
@@ -127,7 +131,7 @@ JuiceBar.exe --quit          close the running instance
 
 - Windows 10 1903+ or Windows 11, x64.
 - No administrator rights, no installer services, no runtime to install.
-- About 24 MB of RAM and no measurable idle CPU.
+- About 25 MB of RAM and no measurable idle CPU.
 
 ## Build from source
 
@@ -166,8 +170,8 @@ The result is `dist\JuiceBar-<version>-setup.exe`.
 
 ## Limitations
 
-- The taskbar pill is drawn next to the notification area on a horizontal taskbar; vertical
-  taskbars are not supported.
+- The pill follows a horizontal taskbar; vertical taskbars are not supported. It floats above the
+  clock by default; *Placement → On the taskbar* puts it left of the tray.
 - Windows has no supported API to pin a layered popup above its own topmost taskbar. After a
   screenshot or a taskbar focus change the shell can raise itself above the pill; a read-only
   z-order check once per second re-asserts the pill only when that actually happened (zero work
@@ -182,8 +186,9 @@ The visual system, icon sources and the taskbar z-order notes are documented in
 
 ## Credits
 
-See [CREDITS.md](CREDITS.md). Icons: Fluent System Icons (MIT) and Lucide (ISC). Text: Inter (OFL).
-The application icon is the Fluent `flash` glyph on a generated violet squircle.
+See [CREDITS.md](CREDITS.md). Icons: Material Symbols Rounded (Apache-2.0) and Fluent System Icons
+(MIT). Text: Inter (OFL). The application icon is the Fluent `flash` glyph on a generated violet
+squircle.
 
 ## License
 

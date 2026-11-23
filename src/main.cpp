@@ -4,6 +4,7 @@
 #include "drivers.h"
 #include "estimate.h"
 #include "history.h"
+#include "jb_version.h"
 #include "ui.h"
 
 #include <propidl.h>
@@ -13,6 +14,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstdio>
 #include <cwchar>
 #include <map>
 #include <memory>
@@ -23,7 +25,7 @@ namespace ch {
 namespace {
 
 const wchar_t* kAppName = L"JuiceBar";
-const wchar_t* kVersion = L"0.1.0";
+const wchar_t* kVersion = JB_VERSION_WIDE;
 const wchar_t* kWindowClass = L"JuiceBarMsg";
 const wchar_t* kRunKey = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 const wchar_t* kRunValue = L"JuiceBar";
@@ -68,10 +70,10 @@ struct App {
     Options options;
     Paths paths;
     Settings settings;
+    bool savedShowPill = true;   // the file value, so --no-pill is not persisted
     History history;
     std::map<std::wstring, DeviceState> devices;
     std::vector<ui::Card> cards;
-    int64_t polledAt = 0;
 
     HANDLE thread = nullptr;
     HANDLE wakeEvent = nullptr;
@@ -90,12 +92,15 @@ void EnsureConsole() {
     SetConsoleOutputCP(CP_UTF8);
 }
 
-void Out(const std::wstring& text) {
+void OutUtf8(const std::string& text) {
     HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
     if (!out || out == INVALID_HANDLE_VALUE) return;
-    const std::string utf8 = Utf8(text);
     DWORD written = 0;
-    WriteFile(out, utf8.data(), (DWORD)utf8.size(), &written, nullptr);
+    WriteFile(out, text.data(), (DWORD)text.size(), &written, nullptr);
+}
+
+void Out(const std::wstring& text) {
+    OutUtf8(Utf8(text));
 }
 
 
@@ -154,7 +159,9 @@ void ShowMenu(HWND owner) {
 }
 
 void SaveSettingsNow() {
-    SaveSettings(app.paths.settingsFile, app.settings);
+    Settings saved = app.settings;
+    if (app.options.noPill) saved.showPill = app.savedShowPill;   // a run-time switch, not a setting
+    SaveSettings(app.paths.settingsFile, saved);
 }
 
 // Called from a driver's reader thread when a device pushed a new status.
@@ -233,8 +240,7 @@ void BuildCards(const std::vector<Reading>& fresh, int64_t now) {
     });
 
     app.cards = std::move(cards);
-    app.polledAt = NowUnix();
-    ui::SetCards(app.cards, app.polledAt);
+    ui::SetCards(app.cards);
 }
 
 DWORD WINAPI PollThread(LPVOID) {
@@ -323,24 +329,55 @@ LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
 void PrintDeviceLine(const Reading& r) {
     const std::wstring percent = r.percent >= 0 ? Fmt(L"%3d%%", r.percent) : L"  ?%";
     const wchar_t* state = r.asleep ? L" (asleep)" : r.charging ? L" (charging)" : L"";
-    std::wstring volts = r.millivolts > 0 ? Fmt(L" %.3fV", r.millivolts / 1000.0) : L"";
-    Out(Fmt(L"  %-34s %s  [%s]%s%s\n", r.name.c_str(), percent.c_str(), r.via.c_str(), state, volts.c_str()));
+    Out(Fmt(L"  %-34s %s  [%s]%s\n", r.name.c_str(), percent.c_str(), r.via.c_str(), state));
+}
+
+std::string JsonString(const std::wstring& text) {
+    const std::string utf8 = Utf8(text);
+    std::string out = "\"";
+    for (unsigned char c : utf8) {
+        switch (c) {
+            case '"': out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\b': out += "\\b"; break;
+            case '\f': out += "\\f"; break;
+            case '\n': out += "\\n"; break;
+            case '\r': out += "\\r"; break;
+            case '\t': out += "\\t"; break;
+            default:
+                if (c < 0x20) {
+                    char buf[8];
+                    std::snprintf(buf, sizeof(buf), "\\u%04x", c);
+                    out += buf;
+                } else {
+                    out += (char)c;
+                }
+        }
+    }
+    out += '"';
+    return out;
 }
 
 int RunOnce() {
     PollReport report = PollDevices();
     if (app.options.json) {
-        std::wstring out = L"[\n";
+        std::string out = "[\n";
         for (size_t i = 0; i < report.devices.size(); i++) {
             const Reading& r = report.devices[i];
-            out += Fmt(L"  {\"id\":\"%s\",\"name\":\"%s\",\"kind\":%d,\"percent\":%d,\"charging\":%s,"
-                       L"\"millivolts\":%d,\"via\":\"%s\",\"driver\":\"%s\"}%s\n",
-                       Utf8(r.id).c_str(), Utf8(r.name).c_str(), (int)r.kind, r.percent,
-                       r.charging ? "true" : "false", r.millivolts, Utf8(r.via).c_str(),
-                       Utf8(r.driver).c_str(), i + 1 < report.devices.size() ? "," : "");
+            out += "  {\"id\":" + JsonString(r.id) +
+                   ",\"name\":" + JsonString(r.name) +
+                   ",\"kind\":" + std::to_string((int)r.kind) +
+                   ",\"percent\":" + std::to_string(r.percent) +
+                   ",\"charging\":" + (r.charging ? "true" : "false") +
+                   ",\"connected\":" + (r.connected ? "true" : "false") +
+                   ",\"asleep\":" + (r.asleep ? "true" : "false") +
+                   ",\"full\":" + (r.full ? "true" : "false") +
+                   ",\"via\":" + JsonString(r.via) +
+                   ",\"driver\":" + JsonString(r.driver) +
+                   "}" + (i + 1 < report.devices.size() ? "," : "") + "\n";
         }
-        out += L"]\n";
-        Out(out);
+        out += "]\n";
+        OutUtf8(out);
         return report.devices.empty() ? 1 : 0;
     }
 
@@ -357,7 +394,8 @@ int RunDump() {
     return 0;
 }
 
-Options ParseOptions(int argc, wchar_t** argv) {    Options o;
+Options ParseOptions(int argc, wchar_t** argv) {
+    Options o;
     for (int i = 1; i < argc; i++) {
         std::wstring arg = argv[i];
         if (arg == L"--once") o.once = true;
@@ -374,8 +412,10 @@ Options ParseOptions(int argc, wchar_t** argv) {    Options o;
             Out(L"  --once           print devices and exit\n");
             Out(L"  --json           print devices as JSON and exit\n");
             Out(L"  --dump           list HID collections and exit\n");
+            Out(L"  --fonts          report the UI fonts and exit\n");
+            Out(L"  --fullscreen     report the fullscreen detection and exit\n");
             Out(L"  --panel          open the panel on start\n");
-            Out(L"  --no-pill        start without the taskbar pill\n");
+            Out(L"  --no-pill        start without the taskbar pill (this run)\n");
             Out(L"  --data <dir>     keep settings and history in <dir>\n");
             Out(L"  --quit           close the running instance\n");
             ExitProcess(0);
@@ -414,6 +454,7 @@ int Run(int argc, wchar_t** argv) {
     app.options = options;
     app.paths = ResolvePaths(options.dataDir);
     app.settings = LoadSettings(app.paths.settingsFile);
+    app.savedShowPill = app.settings.showPill;
     EnsureAutostart(app.settings.autoStart);
     if (options.noPill) app.settings.showPill = false;
     app.pollSeconds = app.settings.pollSeconds;
@@ -455,9 +496,8 @@ int Run(int argc, wchar_t** argv) {
     SetPollWake(WakePoll);
 
     ui::Hooks hooks;
-    hooks.refresh = [] { SetEvent(app.wakeEvent); };
     hooks.menu = [] { ShowMenu(app.hwnd); };
-    ui::Init(app.inst, &app.settings, hooks, app.paths.dataDir);
+    ui::Init(app.inst, &app.settings, hooks);
 
     SetTimer(app.hwnd, TIMER_TICK, 1000, nullptr);
     SetTimer(app.hwnd, TIMER_SAVE, 5 * 60 * 1000, nullptr);

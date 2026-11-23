@@ -6,11 +6,12 @@ and the panel get real per-pixel transparency and rounded edges without a browse
 
 ## Surfaces
 
-- **Pill** — floats just above the taskbar, right-aligned with the clock. Its right edge is fixed
-  and it grows to the left as devices connect, so it stays clear of taskbar buttons, toolbars and
-  widgets. Transparent by default; the device glyph and the level sit on that surface.
-  Hover paints a single very light wash (white at 12/255 on a dark taskbar, black at 10/255 on a
-  light one) over the full strip, square, no outline — the same visual weight as the Explorer tray
+- **Pill** — by default floats just above the clock, right-aligned with the notification area. Its
+  right edge is fixed and it grows to the left as devices connect, so it stays clear of taskbar
+  buttons, toolbars and widgets. *Placement → On the taskbar* puts it left of the tray instead.
+  Transparent by default; the device glyph and the level sit on that surface.
+  Hover paints a single very light inset rounded wash (white at 12/255 on a dark taskbar, black at
+  10/255 on a light one), not a full-height block — the same visual weight as the Explorer tray
   hover. Clicking toggles the panel; right-clicking opens the menu.
 - **Panel** — one compact opaque card with the Windows 11 flyout radius (20 px), no header, no
   footer, no close button. Each device is a row: name, remaining time, level, battery glyph.
@@ -21,8 +22,8 @@ and the panel get real per-pixel transparency and rounded edges without a browse
 
 - Inter (bundled, OFL) in three weights: text, medium, semibold. Registered privately at runtime,
   so the look does not depend on what is installed.
-- The pill uses the same family at taskbar scale; DPI from 100 % to 200 % is handled by scaling
-  every metric from the system DPI.
+- The pill uses Segoe UI Semibold at taskbar scale (it hints better at 13 px than Inter); the panel
+  uses Inter. DPI from 100 % to 200 % is handled by scaling every metric from the system DPI.
 
 ## Icons
 
@@ -32,8 +33,7 @@ and the panel get real per-pixel transparency and rounded edges without a browse
 
 ## Motion
 
-- The panel opens instantly: the window is shown, then painted. No scale/fade animation, because
-  every animation was a race with the mouse hook and the taskbar.
+- The panel fades in over about 120 ms while it is painted; there is no scale animation.
 - The charging battery breathes (a 33 ms timer that runs only while the panel is visible and only
   when something is actually charging).
 - While the panel is closed and nothing changes, the app does **zero** drawing work.
@@ -50,9 +50,9 @@ and the panel get real per-pixel transparency and rounded edges without a browse
 └─────────────────────────────────────────┘
 ```
 
-The panel is anchored to the pill, right-aligned above it, and closes 200 ms after the pointer leaves
-it (or after leaving the pill for anywhere else). Standard `TrackMouseEvent` + a one-shot timer — no
-global hooks, no polling.
+The panel is anchored to the pill (or to the tray when the pill sits on the taskbar) and closes
+200 ms after the pointer leaves it (or after leaving the pill for anywhere else). Standard
+`TrackMouseEvent` + a one-shot timer — no global hooks, no polling.
 
 ## Taskbar z-order
 

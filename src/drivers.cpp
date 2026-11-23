@@ -143,7 +143,6 @@ void PollSteelSeries(const std::vector<HidInterface>& hid, std::vector<Reading>&
             asleep.via = model->wired ? L"USB" : Via2G;
             asleep.driver = L"steelseries";
             asleep.asleep = true;
-            asleep.stamp = NowUnix();
             done.insert(model->receiverPid);
             out.push_back(std::move(asleep));
             continue;
@@ -155,7 +154,6 @@ void PollSteelSeries(const std::vector<HidInterface>& hid, std::vector<Reading>&
         r.kind = Kind::Mouse;
         r.via = model->wired ? L"USB" : Via2G;
         r.driver = L"steelseries";
-        r.stamp = NowUnix();
         if (model->plainPercent) {
             if (reply[1] > 2) continue;
             r.charging = reply[1] != 0;
@@ -338,7 +336,6 @@ void PollRazer(const std::vector<HidInterface>& hid, std::vector<Reading>& out, 
         asleep.via = Via2G;
         asleep.driver = L"razer";
         asleep.asleep = true;
-        asleep.stamp = NowUnix();
         out.push_back(std::move(asleep));
         return;
     }
@@ -362,7 +359,6 @@ void PollRazer(const std::vector<HidInterface>& hid, std::vector<Reading>& out, 
     // 0x2A is the cable / charging state: 0 means running on battery.
     r.charging = cable > 0;
     r.full = r.charging && r.percent >= 100;
-    r.stamp = NowUnix();
     out.push_back(std::move(r));
 }
 
@@ -474,7 +470,6 @@ void PollBluetooth(std::vector<Reading>& out) {
         r.charging = false;
         r.via = L"Bluetooth";
         r.driver = agg.bluetoothLe ? L"bt-le" : L"bt";
-        r.stamp = NowUnix();
         out.push_back(std::move(r));
     }
 }
@@ -517,7 +512,6 @@ void PollXInput(std::vector<Reading>& out) {
         r.percent = percent;
         r.via = L"Wireless";
         r.driver = L"xinput";
-        r.stamp = NowUnix();
         out.push_back(std::move(r));
     }
     FreeLibrary(dll);
@@ -539,6 +533,7 @@ struct SonyPulse {
     bool charging = false;
     int percent = -1;        // not reported while charging
     bool openFailed = false;
+    std::atomic<bool> watching{ false };
 };
 
 std::atomic<void (*)()> gPollWake{ nullptr };
@@ -561,8 +556,7 @@ void SonyReadLoop() {
                 state.charging = false;
                 state.percent = -1;
             }
-            Sleep(5000);
-            continue;
+            break;   // unplugged; the next poll starts a new reader
         }
 
         Hid dev;
@@ -616,14 +610,15 @@ void SonyReadLoop() {
         }
         Sleep(1000);
     }
+    state.watching.store(false);
 }
 
 void PollSony(std::vector<Reading>& out, std::wstring& log) {
     SonyPulse& state = SonyPulseState();
     if (FindHidPath(kSonyPath).empty()) return;   // no dongle
 
-    static std::atomic<bool> watching{ false };
-    if (!watching.exchange(true)) std::thread(SonyReadLoop).detach();
+    bool expected = false;
+    if (state.watching.compare_exchange_strong(expected, true)) std::thread(SonyReadLoop).detach();
 
     bool openFailed = false, haveStatus = false, connected = false, charging = false;
     int percent = -1;
@@ -657,7 +652,6 @@ void PollSony(std::vector<Reading>& out, std::wstring& log) {
     r.asleep = !haveStatus || !connected;
     r.via = Via2G;
     r.driver = L"sony";
-    r.stamp = NowUnix();
     out.push_back(std::move(r));
 }
 
@@ -838,7 +832,6 @@ void PollHyperX(const std::vector<HidInterface>& hid, std::vector<Reading>& out)
                 asleep.asleep = true;
                 asleep.via = L"2.4 GHz";
                 asleep.driver = L"hyperx";
-                asleep.stamp = NowUnix();
                 out.push_back(std::move(asleep));
                 handled.insert(iface.pid);
             }
@@ -855,7 +848,6 @@ void PollHyperX(const std::vector<HidInterface>& hid, std::vector<Reading>& out)
         r.full = charging && r.percent >= 100;
         r.via = L"2.4 GHz";
         r.driver = L"hyperx";
-        r.stamp = NowUnix();
         out.push_back(std::move(r));
     }
 }

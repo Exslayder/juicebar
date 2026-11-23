@@ -30,20 +30,15 @@ constexpr int kPanelTimerAnim = 3;
 
 struct Theme {
     Color bg{ 250, 23, 24, 29 };
-    Color bgSolid{ 255, 23, 24, 29 };
     Color card{ 12, 255, 255, 255 };
     Color cardHover{ 24, 255, 255, 255 };
     Color border{ 26, 255, 255, 255 };
     Color text{ 255, 242, 243, 247 };
     Color sub{ 255, 150, 156, 170 };
     Color faint{ 255, 104, 110, 124 };
-    Color track{ 34, 255, 255, 255 };
     Color accent{ 255, 124, 92, 255 };
     Color red{ 255, 248, 113, 113 };
     Color green{ 255, 74, 222, 128 };
-    Color blue{ 255, 96, 165, 250 };
-    Color amber{ 255, 251, 191, 36 };
-    bool light = false;
 };
 
 struct Fonts {
@@ -164,7 +159,6 @@ struct State {
     HWND panel = nullptr;
 
     std::vector<Card> cards;
-    int64_t polledAt = 0;
 
     bool pillHover = false;
     bool visible = false;
@@ -180,10 +174,6 @@ struct State {
     FontFamily* familyRegular = nullptr;
     FontFamily* familyMedium = nullptr;
     FontFamily* familySemibold = nullptr;
-    bool fontsForLight = false;
-
-    int pillW = 0, pillH = 0;
-    int panelW = 0, panelH = 0;
     std::map<std::wstring, float> ringValues;
     float spin = 0;
     float reveal = 0;
@@ -193,7 +183,6 @@ struct State {
     std::vector<RectF> cardRects;
     bool fullscreen = false;
 
-    bool iconFontFluent = true;
     bool uiFontVariable = true;
 } g;
 
@@ -217,17 +206,6 @@ int IconFor(Kind kind) {
         case Kind::Phone: return icoPhoneFill;
         default: return icoBatteryCharge;
     }
-}
-
-Color AccentColor(int index) {
-    static const Color accents[] = {
-        Color(255, 124, 92, 255),   // violet
-        Color(255, 29, 185, 84),    // Spotify green
-        Color(255, 229, 9, 20),     // Netflix red
-        Color(255, 10, 132, 255),   // Apple blue
-        Color(255, 244, 114, 182),  // pink
-    };
-    return accents[std::clamp(index, 0, 4)];
 }
 
 Color WithAlpha(Color c, BYTE alpha) { return Color(alpha, c.GetR(), c.GetG(), c.GetB()); }
@@ -344,18 +322,6 @@ Color PercentColor(const Card& card) {
     return g.theme.text;
 }
 
-int NominalHours(Kind kind) {
-    switch (kind) {
-        case Kind::Headset: return 40;
-        case Kind::Earbuds: return 8;
-        case Kind::Speaker: return 12;
-        case Kind::Mouse: return 70;
-        case Kind::Keyboard: return 200;
-        case Kind::Gamepad: return 30;
-        default: return 24;
-    }
-}
-
 std::wstring StatusLine(const Card& card) {
     const Reading& r = card.reading;
     const Forecast& f = card.forecast;
@@ -370,12 +336,6 @@ std::wstring StatusLine(const Card& card) {
         return Tr(L"Заряжается", L"Charging");
     }
 
-    if (r.percent > 0 && (f.state == ForecastState::Learning || f.state == ForecastState::Flat ||
-                          f.state == ForecastState::NoData)) {
-        const int minutes = (int)(r.percent * (NominalHours(r.kind) * 60) / 100);
-        return std::wstring(L"≈ ") + FormatSpan(minutes);
-    }
-
     switch (f.state) {
         case ForecastState::Ready:
         case ForecastState::LowConfidence: {
@@ -384,7 +344,11 @@ std::wstring StatusLine(const Card& card) {
         case ForecastState::Flat:
             return Tr(L"Расход стабилен", L"Drain is steady");
         case ForecastState::Learning:
+            if (f.needSec > 0)
+                return Tr(L"Калибровка · ещё ", L"Calibrating · ") + FormatSpan((f.needSec + 59) / 60);
             return Tr(L"Калибровка", L"Calibrating");
+        case ForecastState::NoData:
+            return Tr(L"Ожидание данных", L"Waiting for data");
         default:
             return Tr(L"Ожидание данных", L"Waiting for data");
     }
@@ -505,7 +469,6 @@ void RenderPill() {
         if (px < barRect.left + 8) return;
     }
     g.pillRect = { px, py, px + width, py + height };
-    g.pillH = height;
     canvas.Present(g.pill, px, py);
 }
 
@@ -656,7 +619,6 @@ void RenderPanel() {
     panelX = std::clamp(panelX, (int)work.left + 8, (int)work.right - width - 8);
     panelY = std::clamp(panelY, (int)work.top + 8, (int)work.bottom - height - 8);
 
-    g.panelH = height;
     g.panelPos = { panelX, panelY };
     canvas.Present(g.panel, panelX, panelY, (BYTE)std::lround(255 * std::clamp(g.reveal, 0.0f, 1.0f)));
 }
@@ -664,35 +626,27 @@ void RenderPanel() {
 // ------------------------------------------------------------------ theme & windows
 
 void BuildTheme() {
-    const bool light = g.settings->theme == 2 || (g.settings->theme == 0 && TaskbarIsLight());
-    g.theme.light = light;
-    g.theme.accent = AccentColor(g.settings->accent);
+    const bool light = TaskbarIsLight();
     if (light) {
         g.theme.bg = Color(242, 249, 249, 249);
-        g.theme.bgSolid = Color(255, 249, 249, 249);
         g.theme.card = Color(255, 255, 255, 255);
         g.theme.cardHover = Color(255, 239, 239, 239);
         g.theme.border = Color(30, 60, 60, 67);
         g.theme.text = Color(255, 17, 17, 19);
         g.theme.sub = Color(255, 108, 108, 116);
         g.theme.faint = Color(255, 142, 142, 150);
-        g.theme.track = Color(30, 60, 60, 67);
         g.theme.red = Color(255, 215, 0, 21);
         g.theme.green = Color(255, 36, 138, 61);
-        g.theme.blue = Color(255, 0, 122, 255);
     } else {
         g.theme.bg = Color(236, 32, 32, 32);
-        g.theme.bgSolid = Color(255, 32, 32, 32);
         g.theme.card = Color(255, 43, 43, 43);
         g.theme.cardHover = Color(255, 51, 51, 51);
         g.theme.border = Color(26, 255, 255, 255);
         g.theme.text = Color(255, 255, 255, 255);
         g.theme.sub = Color(255, 161, 161, 166);
         g.theme.faint = Color(255, 124, 124, 130);
-        g.theme.track = Color(31, 255, 255, 255);
         g.theme.red = Color(255, 255, 69, 58);
         g.theme.green = Color(255, 48, 209, 88);
-        g.theme.blue = Color(255, 10, 132, 255);
     }
 }
 
@@ -975,7 +929,7 @@ std::wstring FullscreenReport() { return FullscreenReportImpl(); }
 
 // ------------------------------------------------------------------ public
 
-bool Init(HINSTANCE inst, Settings* settings, Hooks hooks, const std::wstring& dataDir) {
+bool Init(HINSTANCE inst, Settings* settings, Hooks hooks) {
     g.inst = inst;
     g.settings = settings;
     g.hooks = hooks;
@@ -1014,10 +968,6 @@ bool Init(HINSTANCE inst, Settings* settings, Hooks hooks, const std::wstring& d
         FontFamily probe(L"Segoe UI Variable Text");
         g.uiFontVariable = probe.GetLastStatus() == Ok;
     }
-    {
-        FontFamily probe(L"Segoe Fluent Icons");
-        g.iconFontFluent = probe.GetLastStatus() == Ok;
-    }
 
     BuildTheme();
 
@@ -1033,8 +983,10 @@ bool Init(HINSTANCE inst, Settings* settings, Hooks hooks, const std::wstring& d
 
     RebuildFonts();
 
-    ShowWindow(g.pill, SW_SHOWNOACTIVATE);
-    RenderPill();
+    if (g.settings->showPill) {
+        ShowWindow(g.pill, SW_SHOWNOACTIVATE);
+        RenderPill();
+    }
     return true;
 }
 
@@ -1092,9 +1044,8 @@ void Shutdown() {
     DwmFlush();
 }
 
-void SetCards(std::vector<Card> cards, int64_t polledAt) {
+void SetCards(std::vector<Card> cards) {
     g.cards = std::move(cards);
-    g.polledAt = polledAt;
     for (const auto& card : g.cards) {
         if (!g.ringValues.count(card.reading.id)) g.ringValues[card.reading.id] = TargetPercent(card);
     }
@@ -1173,9 +1124,12 @@ void SetSettings(const Settings& settings) {
     *g.settings = settings;
     BuildTheme();
     RebuildFonts();
-    if (g.settings->showPill) ShowWindow(g.pill, SW_SHOWNOACTIVATE);
-    else ShowWindow(g.pill, SW_HIDE);
-    RenderPill();
+    if (g.settings->showPill) {
+        ShowWindow(g.pill, SW_SHOWNOACTIVATE);
+        RenderPill();
+    } else {
+        ShowWindow(g.pill, SW_HIDE);
+    }
     if (g.visible) RenderPanel();
 }
 

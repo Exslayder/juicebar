@@ -13,14 +13,13 @@ struct Card {
 };
 
 struct Hooks {
-    void (*refresh)() = nullptr;
     void (*menu)() = nullptr;       // open the tray menu at the cursor
 };
 
-bool Init(HINSTANCE inst, Settings* settings, Hooks hooks, const std::wstring& dataDir);
+bool Init(HINSTANCE inst, Settings* settings, Hooks hooks);
 void Shutdown();
 
-void SetCards(std::vector<Card> cards, int64_t polledAt);
+void SetCards(std::vector<Card> cards);
 void SetSettings(const Settings& settings);
 
 void Tick();               // cheap: z-order, taskbar geometry, auto-hide

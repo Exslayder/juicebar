@@ -142,7 +142,6 @@ void TestHistoryRoundTrip() {
         r.name = L"Test mouse";
         r.percent = 90 - i / 4;
         r.charging = i > 35;
-        r.stamp = now + i * 60;
         first.Add(r, now + i * 60);
     }
     Check(first.size() >= 20, "one sample a minute is enough to keep a history");

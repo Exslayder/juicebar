@@ -41,6 +41,9 @@ does not use WebView2, Electron or any embedded browser.
 - **HyperX Cloud Stinger Core Wireless + 7.1** (`0951:170B`) — the feature-report connection and
   battery queries, charge codes and voltage curves from **HyperBatteryMonitor** (MIT,
   https://github.com/davidsantanaalves/HyperBatteryMonitor), re-implemented for this code base.
+- **Sony PULSE 3D** (`054C:0D5E`) — the pushed `0xB0` status report (level, charging state,
+  connection flag) as documented by **HeadsetControl** (GPL-3.0) and **pulse3d-battery** (MIT,
+  https://github.com/Ashraf-Obay/pulse3d-battery), re-implemented for this code base.
 - **XInput** battery information via the documented `XInputGetBatteryInformation` API.
 
 ## Inspiration

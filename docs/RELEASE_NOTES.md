@@ -37,8 +37,8 @@ another folder), adds a Start menu shortcut and registers an uninstaller.
 
 ## Note about the Cloud Stinger Core Wireless
 
-The dongle only answers while the headset is switched on. With the headset off, no level is
-available; JuiceBar keeps the last known value dimmed for five minutes and then hides the device.
+The dongle only answers while the headset is switched on. With the headset off, no fresh level is
+available; JuiceBar keeps the last known value dimmed while the dongle stays plugged in.
 
 ## Note about the PULSE 3D
 
@@ -55,7 +55,8 @@ Windows 10 1903+ or Windows 11, x64. No runtime to install.
 
 ## Notes
 
-- The pill lives next to the notification area on a horizontal taskbar.
+- The pill floats above the clock by default (*Placement → On the taskbar* puts it left of the tray)
+  on a horizontal taskbar.
 - While the Start menu is open, Windows keeps its own shell window above every third-party
   overlay; the pill becomes clickable again as soon as the menu closes.
 - Settings: `%APPDATA%\JuiceBar\settings.ini`; history: `%LOCALAPPDATA%\JuiceBar\history.tsv`.

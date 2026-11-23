@@ -20,21 +20,26 @@ $build = Join-Path $root "build"
 New-Item -ItemType Directory -Force $build | Out-Null
 
 # Shared version header for the resource script.
+$parts = $Version.Split('.')
+$vnum = if ($parts.Count -eq 3) { "$($parts[0]),$($parts[1]),$($parts[2]),0" } else { "0,0,0,0" }
 @"
 #pragma once
 #define JB_VERSION_STRING "$Version"
-"@ | Set-Content -Path (Join-Path $build "version.h") -Encoding ASCII
+#define JB_VERSION_WIDE L"$Version"
+#define JB_VERSION_COMMA $vnum
+"@ | Set-Content -Path (Join-Path $build "jb_version.h") -Encoding ASCII
 
 & $windres -i (Join-Path $root "res\app.rc") -o (Join-Path $build "app_res.o") `
     --include-dir (Join-Path $root "res") --include-dir $build
 if ($LASTEXITCODE -ne 0) { throw "windres failed" }
 
-$sources = Get-ChildItem (Join-Path $root "src\*.cpp") | Where-Object { $_.Name -ne "webpanel.cpp" } | ForEach-Object { $_.FullName }
+$sources = Get-ChildItem (Join-Path $root "src\*.cpp") | ForEach-Object { $_.FullName }
 $flags = @(
     "-std=c++17", "-O2", "-municode", "-mwindows", "-static", "-s",
     "-Wall", "-Wextra", "-Wno-unused-parameter", "-Wno-missing-field-initializers",
     "-Wno-cast-function-type",
     "-D_WIN32_WINNT=0x0A00", "-DWINVER=0x0A00", "-DUNICODE", "-D_UNICODE",
+    ("-I" + $build),
     # No PE timestamp: two builds of the same commit are byte-identical, so anyone can verify a
     # release binary by rebuilding it.
     "-Wl,--no-insert-timestamp"

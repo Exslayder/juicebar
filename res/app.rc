@@ -1,5 +1,5 @@
 #include <winver.h>
-#include "version.h"
+#include "jb_version.h"
 
 1 ICON "app.ico"
 201 RCDATA "../fonts/ch_text.ttf"
@@ -26,8 +26,8 @@
 330 RCDATA "icons/battery10.png"
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION 1,0,2,0
-PRODUCTVERSION 1,0,2,0
+FILEVERSION JB_VERSION_COMMA
+PRODUCTVERSION JB_VERSION_COMMA
 FILEOS VOS_NT_WINDOWS32
 FILETYPE VFT_APP
 BEGIN

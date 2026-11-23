@@ -22,6 +22,8 @@ All notable changes to JuiceBar are documented here. The format follows
 
 ### Fixed
 
+- `--once` and `--help` now report the real build version instead of `0.1.0`; the numeric Windows
+  resource version is generated from the same value instead of being hardcoded.
 - Windows 10: the pill no longer hides for ordinary maximized documents. Windows 10 reports
   `QUNS_BUSY` for them, and with an auto-hidden taskbar a maximized window covers the whole
   monitor; both fooled the fullscreen check. It now ignores `QUNS_BUSY` and maximized windows and
@@ -37,7 +39,7 @@ All notable changes to JuiceBar are documented here. The format follows
 ### Notes
 
 - The Stinger Core dongle only answers while the headset is powered on; when it is off, JuiceBar
-  keeps showing the last level until the device disappears.
+  keeps showing the last level while the dongle stays plugged in.
 - The PULSE 3D dongle only reports on change (power, a button, the cable, a 10 % step) and only to
   a reader that is already open. JuiceBar keeps the collection open permanently, so any change is
   caught and the pill updates right away. Right after a start, press a volume button on the headset

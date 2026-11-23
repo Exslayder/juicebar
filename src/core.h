@@ -18,14 +18,12 @@ struct Reading {
     std::wstring name;
     Kind kind = Kind::Other;
     int percent = -1;         // 0..100, -1 when unknown
-    int millivolts = 0;       // battery voltage when the device reports it
     bool charging = false;
     bool full = false;        // on power and fully charged
     bool asleep = false;      // last known value, device not answering
     bool connected = true;
     std::wstring via;         // "2.4 GHz", "USB", "Bluetooth"
     std::wstring driver;      // which driver produced the reading
-    int64_t stamp = 0;        // unix seconds of the reading
 };
 
 int64_t NowUnix();
