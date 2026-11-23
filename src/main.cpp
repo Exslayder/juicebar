@@ -202,7 +202,6 @@ void BuildCards(const std::vector<Reading>& fresh, int64_t now) {
         if (state.last.asleep && !app.settings.dimSleeping) card.reading.asleep = false;
         std::vector<Sample> six = app.history.Get(id, now - 6 * 3600);
         card.forecast = Estimate(six, card.reading.percent, card.reading.charging && !card.reading.asleep, now);
-        card.spark = app.history.Get(id, now - 24 * 3600);
         cards.push_back(std::move(card));
     }
 

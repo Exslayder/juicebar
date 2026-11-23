@@ -52,7 +52,7 @@ struct Fonts {
     std::unique_ptr<FontFamily> fallbackSemi;
     std::unique_ptr<FontFamily> iconFamily;
     std::unique_ptr<FontFamily> pillFamily;
-    std::unique_ptr<Font> title, name, body, small, tiny, status, percent, glyph, iconSmall, pillGlyph, pillPct, ringPct;
+    std::unique_ptr<Font> name, small, status, percent, pillPct;
 
     // Inter runs a touch wider than Segoe UI at the same size, so the scale is slightly smaller.
     void Build(float scale, bool hasUi, FontFamily* regular, FontFamily* medium, FontFamily* semibold) {
@@ -74,22 +74,15 @@ struct Fonts {
             FontFamily* family = icon ? iconFamily.get() : weight == 2 ? semibold : weight == 1 ? medium : regular;
             f = std::make_unique<Font>(family, px * scale, FontStyleRegular, UnitPixel);
         };
-        make(title, 2, 15.5f, false);
         make(name, 2, 14.5f, false);
-        make(body, 1, 13.5f, false);
         make(status, 2, 13.5f, false);
         make(small, 0, 12.0f, false);
-        make(tiny, 0, 11.0f, false);
         make(percent, 2, 19.0f, false);
-        make(glyph, 0, 17.0f, true);
-        make(iconSmall, 0, 12.0f, true);
-        make(pillGlyph, 0, 15.0f, true);
         // The taskbar text is small: Segoe UI hints better at 13 px than Inter, and an integer
         // size keeps GDI+ from blurring the strokes.
         pillFamily = std::make_unique<FontFamily>(L"Segoe UI Semibold");
         if (pillFamily->GetLastStatus() != Ok) pillFamily = std::make_unique<FontFamily>(L"Segoe UI");
         pillPct = std::make_unique<Font>(pillFamily.get(), 13.0f * scale, FontStyleRegular, UnitPixel);
-        make(ringPct, 2, 16.0f, false);
     }
 };
 
@@ -174,9 +167,7 @@ struct State {
     int64_t polledAt = 0;
 
     bool pillHover = false;
-    bool panelHover = false;
     bool visible = false;
-    bool hideWhenCursorLeaves = true;
 
     int hoveredCard = -1;
 
@@ -195,14 +186,12 @@ struct State {
     int panelW = 0, panelH = 0;
     std::map<std::wstring, float> ringValues;
     float spin = 0;
-    float hoverGlow = 0;
     float reveal = 0;
     ULONGLONG animLast = 0;
     POINT panelPos{};
     RECT pillRect{};
     std::vector<RectF> cardRects;
     bool fullscreen = false;
-    ULONGLONG panelShownTick = 0;
 
     bool iconFontFluent = true;
     bool uiFontVariable = true;
@@ -502,12 +491,11 @@ void RenderPill() {
 
     // Float just above the clock; the right edge stays put and the pill grows to the left as
     // devices connect, so it never covers taskbar buttons, toolbars or widgets.
-    const int pillRight = notifyRect.right - (int)std::lround(40 * g.scale);
+    const int pillRight = notifyRect.right - (int)std::lround(12 * g.scale);
     const int px = pillRight - width;
     const int py = barRect.top - height - (int)std::lround(4 * g.scale);
     if (px < barRect.left + 8) return;
     g.pillRect = { px, py, px + width, py + height };
-    g.pillW = width;
     g.pillH = height;
     canvas.Present(g.pill, px, py);
 }
@@ -653,7 +641,6 @@ void RenderPanel() {
     panelX = std::clamp(panelX, (int)work.left + 8, (int)work.right - width - 8);
     panelY = std::clamp(panelY, (int)work.top + 8, (int)work.bottom - height - 8);
 
-    g.panelW = width;
     g.panelH = height;
     g.panelPos = { panelX, panelY };
     canvas.Present(g.panel, panelX, panelY, (BYTE)std::lround(255 * std::clamp(g.reveal, 0.0f, 1.0f)));
@@ -724,7 +711,6 @@ void ShowPanelInternal() {
     if (!g.reveal) g.reveal = 0.0f;
     g.animLast = 0;
     ShowWindow(g.panel, SW_SHOWNOACTIVATE);
-    g.panelShownTick = GetTickCount64();
     ShowWindow(g.panel, SW_SHOWNOACTIVATE);
     SetWindowPos(g.panel, HWND_TOPMOST, g.panelPos.x, g.panelPos.y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
     SetTimer(g.panel, kPanelTimerAnim, 33, nullptr);
@@ -734,7 +720,6 @@ void ShowPanelInternal() {
 void HidePanelInternal() {
 
     g.visible = false;
-    g.panelHover = false;
     g.hoveredCard = -1;
     if (!g.panel) return;
     KillTimer(g.panel, kPanelTimerHide);
@@ -822,11 +807,6 @@ void Animate() {
         g.spin += dt * 150.0f;
         if (g.spin >= 360.0f) g.spin -= 360.0f;
     }
-    const float hoverTarget = g.hoveredCard >= 0 ? 1.0f : 0.0f;
-    if (std::fabs(hoverTarget - g.hoverGlow) > 0.01f) {
-        g.hoverGlow += (hoverTarget - g.hoverGlow) * std::min(1.0f, dt * 12.0f);
-        active = true;
-    }
     if (g.reveal < 1.0f) {
         g.reveal = std::min(1.0f, g.reveal + dt * 8.0f);
         active = true;
@@ -901,8 +881,7 @@ LRESULT CALLBACK PanelProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             return 0;
         }
         case WM_MOUSELEAVE:
-            g.panelHover = false;
-            g.hoveredCard = -1;
+                    g.hoveredCard = -1;
             SetTimer(h, kPanelTimerHide, 200, nullptr);
             RenderPanel();
             return 0;
@@ -1080,16 +1059,6 @@ void SetCards(std::vector<Card> cards, int64_t polledAt) {
     if (g.visible) RenderPanel();
 }
 
-void SetSettings(const Settings& settings) {
-    if (!g.settings) return;
-    *g.settings = settings;
-    BuildTheme();
-    RebuildFonts();
-    if (g.settings->showPill) ShowWindow(g.pill, SW_SHOWNOACTIVATE);
-    else ShowWindow(g.pill, SW_HIDE);
-    RenderPill();
-}
-
 void Tick() {
     if (!g.pill || !g.panel) return;
 
@@ -1156,10 +1125,6 @@ void OnSystemSettingsChanged() {
 }
 
 void ShowPanelNow() { ShowPanelInternal(); }
-
-void HidePanel() { HidePanelInternal(); }
-
-bool PanelVisible() { return g.visible; }
 
 std::wstring FontReport() {
     using namespace Gdiplus;

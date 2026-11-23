@@ -524,8 +524,6 @@ void PollXInput(std::vector<Reading>& out) {
 
 // ---------------------------------------------------------------- HyperX (Cloud series)
 
-constexpr uint16_t kHyperxVids[] = { 0x03F0, 0x0951 };   // HP/HyperX and Kingston
-
 struct HyperxModel {
     uint16_t vid;
     uint16_t pid;
