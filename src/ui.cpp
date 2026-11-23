@@ -360,6 +360,7 @@ std::wstring StatusLine(const Card& card) {
     const Reading& r = card.reading;
     const Forecast& f = card.forecast;
     if (!r.connected) return Tr(L"Не подключено", L"Not connected");
+    if (r.asleep && r.percent < 0) return Tr(L"Ждём первый замер", L"Waiting for the first reading");
     if (r.asleep) return Tr(L"Нет ответа · последний замер", L"No answer · last reading");
 
     if (r.charging) {

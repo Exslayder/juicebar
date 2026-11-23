@@ -96,6 +96,42 @@ std::vector<HidInterface> EnumerateHid(bool all) {
     return result;
 }
 
+std::wstring FindHidPath(const std::wstring& match) {
+    std::wstring needle = match;
+    for (auto& c : needle) c = (wchar_t)towlower(c);
+
+    GUID hidGuid{};
+    HidD_GetHidGuid(&hidGuid);
+    HDEVINFO set = SetupDiGetClassDevsW(&hidGuid, nullptr, nullptr, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+    if (set == INVALID_HANDLE_VALUE) return L"";
+
+    std::wstring found;
+    for (DWORD index = 0;; index++) {
+        SP_DEVICE_INTERFACE_DATA ifd{};
+        ifd.cbSize = sizeof(ifd);
+        if (!SetupDiEnumDeviceInterfaces(set, nullptr, &hidGuid, index, &ifd)) break;
+
+        DWORD needed = 0;
+        SetupDiGetDeviceInterfaceDetailW(set, &ifd, nullptr, 0, &needed, nullptr);
+        if (!needed) continue;
+        std::vector<BYTE> storage(needed);
+        auto* detail = reinterpret_cast<PSP_DEVICE_INTERFACE_DETAIL_DATA_W>(storage.data());
+        detail->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_W);
+        if (!SetupDiGetDeviceInterfaceDetailW(set, &ifd, detail, needed, nullptr, nullptr)) continue;
+
+        std::wstring path = detail->DevicePath;
+        std::wstring lower = path;
+        for (auto& c : lower) c = (wchar_t)towlower(c);
+        if (lower.find(needle) != std::wstring::npos) {
+            found = std::move(path);
+            break;
+        }
+    }
+
+    SetupDiDestroyDeviceInfoList(set);
+    return found;
+}
+
 Hid::~Hid() { Close(); }
 
 bool Hid::Open(const std::wstring& path) {
@@ -108,17 +144,7 @@ bool Hid::Open(const std::wstring& path) {
         Close();
         return false;
     }
-
-    PHIDP_PREPARSED_DATA pp = nullptr;
-    if (HidD_GetPreparsedData(handle_, &pp)) {
-        HIDP_CAPS caps{};
-        if (HidP_GetCaps(pp, &caps) == HIDP_STATUS_SUCCESS) {
-            inLen_ = caps.InputReportByteLength;
-            outLen_ = caps.OutputReportByteLength;
-            featureLen_ = caps.FeatureReportByteLength;
-        }
-        HidD_FreePreparsedData(pp);
-    }
+    ReadCaps();
     // A collection may be input-only (the PULSE 3D status collection only needs reads); writes then
     // fail in WritePadded instead of refusing to open.
     if (!inLen_) {
@@ -126,6 +152,32 @@ bool Hid::Open(const std::wstring& path) {
         return false;
     }
     return true;
+}
+
+bool Hid::OpenRead(const std::wstring& path) {
+    Close();
+    handle_ = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                          OPEN_EXISTING, 0, nullptr);
+    if (handle_ == INVALID_HANDLE_VALUE) return false;
+    blocking_ = true;
+    ReadCaps();
+    if (!inLen_) {
+        Close();
+        return false;
+    }
+    return true;
+}
+
+void Hid::ReadCaps() {
+    PHIDP_PREPARSED_DATA pp = nullptr;
+    if (!HidD_GetPreparsedData(handle_, &pp)) return;
+    HIDP_CAPS caps{};
+    if (HidP_GetCaps(pp, &caps) == HIDP_STATUS_SUCCESS) {
+        inLen_ = caps.InputReportByteLength;
+        outLen_ = caps.OutputReportByteLength;
+        featureLen_ = caps.FeatureReportByteLength;
+    }
+    HidD_FreePreparsedData(pp);
 }
 
 void Hid::Close() {
@@ -138,9 +190,11 @@ void Hid::Close() {
         event_ = nullptr;
     }
     inLen_ = outLen_ = featureLen_ = 0;
+    blocking_ = false;
 }
 
-bool Hid::Io(std::vector<BYTE>& buf, DWORD bytes, bool isWrite, int timeoutMs) {
+bool Hid::Io(std::vector<BYTE>& buf, DWORD bytes, bool isWrite, int timeoutMs, bool& timedOut) {
+    timedOut = false;
     if (handle_ == INVALID_HANDLE_VALUE) return false;
     ResetEvent(event_);
     OVERLAPPED ov{};
@@ -155,6 +209,7 @@ bool Hid::Io(std::vector<BYTE>& buf, DWORD bytes, bool isWrite, int timeoutMs) {
         if (WaitForSingleObject(event_, (DWORD)timeoutMs) != WAIT_OBJECT_0) {
             CancelIoEx(handle_, &ov);
             WaitForSingleObject(event_, 100);
+            timedOut = true;
             return false;
         }
     }
@@ -169,13 +224,26 @@ bool Hid::WritePadded(const std::vector<BYTE>& data) {
     std::vector<BYTE> buf((size_t)outLen_, 0);
     if (data.size() > buf.size()) return false;
     memcpy(buf.data(), data.data(), data.size());
-    return Io(buf, (DWORD)buf.size(), true, 500);
+    bool timedOut = false;
+    return Io(buf, (DWORD)buf.size(), true, 500, timedOut);
 }
 
 int Hid::Read(std::vector<BYTE>& out, int timeoutMs) {
-    if (!ok() || !inLen_) return -1;
+    if (!ok() || !inLen_ || blocking_) return -1;
     std::vector<BYTE> buf((size_t)inLen_, 0);
-    if (!Io(buf, (DWORD)buf.size(), false, timeoutMs)) return 0;
+    bool timedOut = false;
+    if (!Io(buf, (DWORD)buf.size(), false, timeoutMs, timedOut)) return timedOut ? 0 : -1;
+    out = std::move(buf);
+    return (int)out.size();
+}
+
+int Hid::ReadBlocking(std::vector<BYTE>& out) {
+    if (!ok() || !inLen_ || !blocking_) return -1;
+    std::vector<BYTE> buf((size_t)inLen_, 0);
+    DWORD read = 0;
+    if (!ReadFile(handle_, buf.data(), (DWORD)buf.size(), &read, nullptr)) return -1;
+    if (!read) return -1;
+    buf.resize(read);
     out = std::move(buf);
     return (int)out.size();
 }

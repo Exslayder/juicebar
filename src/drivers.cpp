@@ -11,11 +11,14 @@
 #include <cfgmgr32.h>
 
 #include <algorithm>
+#include <atomic>
 #include <functional>
 #include <cwchar>
 #include <cmath>
 #include <map>
+#include <mutex>
 #include <set>
+#include <thread>
 
 namespace ch {
 namespace {
@@ -524,81 +527,134 @@ void PollXInput(std::vector<Reading>& out) {
 
 // The PULSE 3D dongle (054C:0D5E) never answers queries. It pushes an 8-byte status report
 // (ID 0xB0) only when something changes: power on/off, a button, the charge cable, or a battery
-// step (roughly once an hour, in 10% steps). The handle therefore stays open between polls so
-// those reports queue in the OS buffer instead of being lost while the device is closed.
+// step (roughly once an hour, in 10% steps), and only to a connection that is open at that moment.
+// The collection is therefore opened once, read-only, and a background thread blocks in ReadFile so
+// no report is missed; polling the handle would lose everything that happens in between.
+constexpr wchar_t kSonyPath[] = L"vid_054c&pid_0d5e&mi_03&col04";
+
 struct SonyPulse {
-    Hid dev;
-    std::wstring path;
+    std::mutex lock;
     bool haveStatus = false;
     bool connected = false;
     bool charging = false;
-    int percent = -1;   // not reported while charging
+    int percent = -1;        // not reported while charging
+    bool openFailed = false;
 };
 
-SonyPulse& SonyPulseStatus() {
-    static SonyPulse status;
-    return status;
+std::atomic<void (*)()> gPollWake{ nullptr };
+
+SonyPulse& SonyPulseState() {
+    // Leaked on purpose: the detached reader may still be in ReadFile while the process exits.
+    static SonyPulse* state = new SonyPulse();
+    return *state;
 }
 
-void PollSony(const std::vector<HidInterface>& hid, std::vector<Reading>& out, std::wstring& log) {
-    SonyPulse& status = SonyPulseStatus();
-    const HidInterface* iface = nullptr;
-    for (const auto& i : hid) {
-        // The status lives on the vendor collection, not on the media-key collections.
-        if (i.vid == 0x054C && i.pid == 0x0D5E && i.usagePage == 0xFF01 && i.usage == 0x0020) {
-            iface = &i;
-            break;
+void SonyReadLoop() {
+    SonyPulse& state = SonyPulseState();
+    for (;;) {
+        const std::wstring path = FindHidPath(kSonyPath);
+        if (path.empty()) {
+            {
+                std::lock_guard<std::mutex> guard(state.lock);
+                state.haveStatus = false;
+                state.connected = false;
+                state.charging = false;
+                state.percent = -1;
+            }
+            Sleep(5000);
+            continue;
         }
+
+        Hid dev;
+        if (!dev.OpenRead(path)) {
+            {
+                std::lock_guard<std::mutex> guard(state.lock);
+                state.openFailed = true;
+            }
+            Sleep(2000);
+            continue;
+        }
+        {
+            std::lock_guard<std::mutex> guard(state.lock);
+            state.openFailed = false;
+        }
+
+        std::vector<BYTE> report;
+        for (;;) {
+            if (dev.ReadBlocking(report) <= 0) break;   // unplugged or a driver error
+            if (report.size() < 8 || report[0] != 0xB0) continue;   // a media-key report
+
+            bool changed = false;
+            {
+                std::lock_guard<std::mutex> guard(state.lock);
+                const bool connected = (report[4] & 0x08) != 0;
+                changed = !state.haveStatus || state.connected != connected;
+                state.haveStatus = true;
+                state.connected = connected;
+                if (report[3] == 0x80) {
+                    changed = changed || !state.charging;
+                    state.charging = true;   // on the cable; the level is withheld meanwhile
+                } else if (report[3] <= 100) {
+                    changed = changed || state.charging || state.percent != report[3];
+                    state.charging = false;
+                    state.percent = report[3];
+                }
+            }
+            // Refresh the pill right away instead of at the next scheduled poll.
+            if (changed) {
+                auto wake = gPollWake.load();
+                if (wake) wake();
+            }
+        }
+
+        {
+            std::lock_guard<std::mutex> guard(state.lock);
+            state.haveStatus = false;
+            state.connected = false;
+            state.charging = false;
+            state.percent = -1;
+        }
+        Sleep(1000);
     }
-    if (!iface) {
-        status.dev.Close();
-        status.path.clear();
-        status.haveStatus = false;
+}
+
+void PollSony(std::vector<Reading>& out, std::wstring& log) {
+    SonyPulse& state = SonyPulseState();
+    if (FindHidPath(kSonyPath).empty()) return;   // no dongle
+
+    static std::atomic<bool> watching{ false };
+    if (!watching.exchange(true)) std::thread(SonyReadLoop).detach();
+
+    bool openFailed = false, haveStatus = false, connected = false, charging = false;
+    int percent = -1;
+    {
+        std::lock_guard<std::mutex> guard(state.lock);
+        openFailed = state.openFailed;
+        state.openFailed = false;
+        haveStatus = state.haveStatus;
+        connected = state.connected;
+        charging = state.charging;
+        percent = state.percent;
+    }
+
+    if (openFailed) {
+        log += L"Sony: the PULSE 3D dongle is present but its status interface cannot be opened\n";
         return;
     }
+    if (!haveStatus)
+        log += L"Sony: dongle found, waiting for the first status report (press a volume button)\n";
 
-    if (!status.dev.ok() || status.path != iface->path) {
-        status.dev.Close();
-        if (!status.dev.Open(iface->path)) {
-            log += L"Sony: the PULSE 3D dongle is present but its status interface cannot be opened\n";
-            status.path.clear();
-            status.haveStatus = false;
-            return;
-        }
-        status.path = iface->path;
-        status.haveStatus = false;
-        status.connected = false;
-        status.charging = false;
-        status.percent = -1;
-    }
-
-    // Drain what the dongle queued since the last poll. Interface 3 also carries media-key
-    // reports, which use other report IDs; the cap guards against a report flood.
-    std::vector<BYTE> report;
-    for (int i = 0; i < 64; i++) {
-        if (status.dev.Read(report, 15) <= 0) break;
-        if (report.size() < 8 || report[0] != 0xB0) continue;
-        status.haveStatus = true;
-        status.connected = (report[4] & 0x08) != 0;
-        if (report[3] == 0x80) {
-            status.charging = true;   // on the cable; the level is withheld meanwhile
-        } else if (report[3] <= 100) {
-            status.charging = false;
-            status.percent = report[3];
-        }
-    }
-
-    // Reports only arrive on change, so a fresh session may wait a while for the first one.
-    // Until then (and while the headset is off) keep the device out of the list.
-    if (!status.haveStatus || !status.connected) return;
-
+    // Shown as soon as the dongle is present, like the reference reader: "?" until the first
+    // report, the last level dimmed while the headset is off.
     Reading r;
     r.id = L"sony:pulse3d";
     r.name = L"Sony PULSE 3D";
     r.kind = Kind::Headset;
-    r.percent = status.percent;
-    r.charging = status.charging;
-    r.full = status.charging && status.percent >= 100;
+    r.percent = percent;
+    r.charging = charging;
+    r.full = charging && percent >= 100;
+    r.connected = haveStatus ? connected : true;
+    r.asleep = !haveStatus || !connected;
     r.via = Via2G;
     r.driver = L"sony";
     r.stamp = NowUnix();
@@ -606,6 +662,10 @@ void PollSony(const std::vector<HidInterface>& hid, std::vector<Reading>& out, s
 }
 
 } // namespace
+
+void SetPollWake(void (*wake)()) {
+    gPollWake.store(wake);
+}
 
 // ---------------------------------------------------------------- HyperX (Cloud series)
 
@@ -806,7 +866,7 @@ PollReport PollDevices() {
     PollSteelSeries(hid, report.devices, report.log);
     PollRazer(hid, report.devices, report.log);
     PollHyperX(hid, report.devices);
-    PollSony(hid, report.devices, report.log);
+    PollSony(report.devices, report.log);
     PollBluetooth(report.devices);
     PollXInput(report.devices);
 

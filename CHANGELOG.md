@@ -16,7 +16,9 @@ All notable changes to JuiceBar are documented here. The format follows
 - An experimental probe for other HyperX dongles (HP `0x03f0`, Kingston `0x0951`): the common
   vendor protocols are tried and a device is shown only when the dongle actually answers.
 - Sony PULSE 3D (`054C:0D5E`): the dongle pushes status reports with the battery level (10 %
-  steps) and the connection state; the handle is kept open between polls so no report is lost.
+  steps) and the connection state. A background reader keeps its collection open and blocks in
+  `ReadFile`, so every change is caught and the pill refreshes immediately; the device shows as
+  "?" until the first report arrives.
 
 ### Fixed
 
@@ -36,8 +38,10 @@ All notable changes to JuiceBar are documented here. The format follows
 
 - The Stinger Core dongle only answers while the headset is powered on; when it is off, JuiceBar
   keeps showing the last level until the device disappears.
-- The PULSE 3D dongle only reports on change (power, a button, the cable, a 10 % step). Right after
-  a start the first status may need a volume-button press on the headset.
+- The PULSE 3D dongle only reports on change (power, a button, the cable, a 10 % step) and only to
+  a reader that is already open. JuiceBar keeps the collection open permanently, so any change is
+  caught and the pill updates right away. Right after a start, press a volume button on the headset
+  to get the first status; until then the device is shown with "?".
 
 ## [1.0.1] — 2026-11-22
 

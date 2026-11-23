@@ -18,6 +18,10 @@ struct HidInterface {
 // a restart. Pass all=true for --dump.
 std::vector<HidInterface> EnumerateHid(bool all = false);
 
+// Path of the first present HID interface whose path contains `match` (case-insensitive), without
+// opening any device. Empty when not found. Used to watch a specific collection.
+std::wstring FindHidPath(const std::wstring& match);
+
 class Hid {
 public:
     Hid() = default;
@@ -26,6 +30,9 @@ public:
     Hid& operator=(const Hid&) = delete;
 
     bool Open(const std::wstring& path);
+    // Read-only synchronous open for push-only devices (the Sony dongle never answers queries):
+    // ReadBlocking() then waits in the driver until a report arrives, at zero idle CPU.
+    bool OpenRead(const std::wstring& path);
     void Close();
     bool ok() const { return handle_ != INVALID_HANDLE_VALUE; }
 
@@ -33,6 +40,8 @@ public:
     bool WritePadded(const std::vector<BYTE>& data);
     // Returns bytes read (>0), 0 on timeout, -1 on error. Also returns the timeout error as 0.
     int Read(std::vector<BYTE>& out, int timeoutMs);
+    // Blocks until the device sends a report. Only for a handle from OpenRead(). -1 on error.
+    int ReadBlocking(std::vector<BYTE>& out);
     bool GetInputReport(BYTE reportId, std::vector<BYTE>& buf);
     // Feature reports (control transfers); the report ID is byte 0 of `data`/`buf`.
     bool SetFeature(const std::vector<BYTE>& data);
@@ -46,7 +55,9 @@ private:
     HANDLE handle_ = INVALID_HANDLE_VALUE;
     HANDLE event_ = nullptr;
     int inLen_ = 0, outLen_ = 0, featureLen_ = 0;
-    bool Io(std::vector<BYTE>& buf, DWORD bytes, bool isWrite, int timeoutMs);
+    bool blocking_ = false;
+    void ReadCaps();
+    bool Io(std::vector<BYTE>& buf, DWORD bytes, bool isWrite, int timeoutMs, bool& timedOut);
 };
 
 } // namespace ch

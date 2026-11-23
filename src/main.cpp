@@ -157,6 +157,11 @@ void SaveSettingsNow() {
     SaveSettings(app.paths.settingsFile, app.settings);
 }
 
+// Called from a driver's reader thread when a device pushed a new status.
+void WakePoll() {
+    if (app.wakeEvent) SetEvent(app.wakeEvent);
+}
+
 void HandleCommand(UINT id) {
     if (id == ID_REFRESH) {
         SetEvent(app.wakeEvent);
@@ -447,6 +452,7 @@ int Run(int argc, wchar_t** argv) {
 
     app.wakeEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
     app.stopEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    SetPollWake(WakePoll);
 
     ui::Hooks hooks;
     hooks.refresh = [] { SetEvent(app.wakeEvent); };
@@ -470,6 +476,7 @@ int Run(int argc, wchar_t** argv) {
         DispatchMessageW(&msg);
     }
 
+    SetPollWake(nullptr);
     if (app.wakeEvent) CloseHandle(app.wakeEvent);
     if (app.stopEvent) CloseHandle(app.stopEvent);
     if (mutex) CloseHandle(mutex);
