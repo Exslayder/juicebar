@@ -12,6 +12,7 @@
 #include <UIAutomation.h>
 #include <oleauto.h>
 #include <atomic>
+#include <mutex>
 
 #include <algorithm>
 #include <cmath>
@@ -214,74 +215,106 @@ struct State {
 } g;
 
 
-// Taskbar app buttons are XAML on Windows 11, so their bounds are only available through UI
-// Automation. A small watcher keeps the app-button group and the Start button, letting the pill
-// step left of the buttons when the taskbar is crowded.
+// Taskbar content on Windows 11 is a mix of XAML (app buttons, widgets, the Start button) and
+// classic toolbar/deskband windows. A small UI Automation watcher collects the visible rectangles
+// left of the tray so the pill can step aside instead of covering them.
+constexpr int kMaxContent = 32;
+RECT g_content[kMaxContent]{};
+int g_contentCount = 0;
+std::mutex g_contentMutex;
 HANDLE g_buttonStop = nullptr;
 HANDLE g_buttonThread = nullptr;
-std::atomic<LONG> g_buttonLeft{ 0 }, g_buttonRight{ 0 }, g_startLeft{ 0 };
 
-void ReadTaskbarButtons(IUIAutomation* uia, LONG& left, LONG& right, LONG& startLeft) {
-    left = right = startLeft = 0;
-    if (!uia) return;
-    IUIAutomationElement* root = nullptr;
-    if (SUCCEEDED(uia->GetRootElement(&root)) && root) {
+void CollectUiaContent(IUIAutomation* uia, IUIAutomationElement* bar, LONG trayLeft,
+                       std::vector<RECT>& out) {
+    // Only the two known XAML classes are queried: a full tree walk can be very slow and can stall
+    // on a plain toolbar window that has no UI Automation provider.
+    auto collect = [&](IUIAutomationCondition* cond) {
+        if (!cond) return;
+        IUIAutomationElementArray* arr = nullptr;
+        if (SUCCEEDED(bar->FindAll(TreeScope_Descendants, cond, &arr)) && arr) {
+            int count = 0;
+            arr->get_Length(&count);
+            for (int i = 0; i < count; i++) {
+                IUIAutomationElement* e = nullptr;
+                if (FAILED(arr->GetElement(i, &e)) || !e) continue;
+                BSTR cls = nullptr;
+                e->get_CurrentClassName(&cls);
+                const bool tray = cls && !wcsncmp(cls, L"SystemTray.", 11);
+                if (cls) SysFreeString(cls);
+                RECT r{};
+                if (!tray && SUCCEEDED(e->get_CurrentBoundingRectangle(&r))) {
+                    const int w = r.right - r.left, h = r.bottom - r.top;
+                    if (h > 0 && h <= 80 && w > 2 && w < 1200 && r.left >= 0 && r.right <= trayLeft)
+                        out.push_back(r);
+                }
+                e->Release();
+            }
+            arr->Release();
+        }
+    };
+
+    for (const wchar_t* cls : { L"Taskbar.TaskListButtonAutomationPeer", L"ToggleButton" }) {
         VARIANT v;
         VariantInit(&v);
         v.vt = VT_BSTR;
-        v.bstrVal = SysAllocString(L"Shell_TrayWnd");
+        v.bstrVal = SysAllocString(cls);
         IUIAutomationCondition* cond = nullptr;
         if (SUCCEEDED(uia->CreatePropertyCondition(UIA_ClassNamePropertyId, v, &cond)) && cond) {
-            IUIAutomationElement* bar = nullptr;
-            if (SUCCEEDED(root->FindFirst(TreeScope_Children, cond, &bar)) && bar) {
-                VariantClear(&v);
-                v.vt = VT_BSTR;
-                v.bstrVal = SysAllocString(L"Taskbar.TaskListButtonAutomationPeer");
-                cond->Release();
-                cond = nullptr;
-                if (SUCCEEDED(uia->CreatePropertyCondition(UIA_ClassNamePropertyId, v, &cond)) && cond) {
-                    IUIAutomationElementArray* arr = nullptr;
-                    if (SUCCEEDED(bar->FindAll(TreeScope_Descendants, cond, &arr)) && arr) {
-                        int len = 0;
-                        arr->get_Length(&len);
-                        for (int i = 0; i < len; i++) {
-                            IUIAutomationElement* e = nullptr;
-                            if (FAILED(arr->GetElement(i, &e)) || !e) continue;
-                            RECT r{};
-                            if (SUCCEEDED(e->get_CurrentBoundingRectangle(&r))) {
-                                if (left == 0 || r.left < left) left = r.left;
-                                if (r.right > right) right = r.right;
-                            }
-                            e->Release();
-                        }
-                        arr->Release();
-                    }
-                }
-                VariantClear(&v);
-
-                VariantInit(&v);
-                v.vt = VT_BSTR;
-                v.bstrVal = SysAllocString(L"ToggleButton");
-                if (cond) cond->Release();
-                cond = nullptr;
-                if (SUCCEEDED(uia->CreatePropertyCondition(UIA_ClassNamePropertyId, v, &cond)) && cond) {
-                    IUIAutomationElement* start = nullptr;
-                    if (SUCCEEDED(bar->FindFirst(TreeScope_Descendants, cond, &start)) && start) {
-                        RECT r{};
-                        if (SUCCEEDED(start->get_CurrentBoundingRectangle(&r))) startLeft = r.left;
-                        start->Release();
-                    }
-                    cond->Release();
-                }
-                VariantClear(&v);
-                bar->Release();
-            } else {
-                cond->Release();
-            }
+            collect(cond);
+            cond->Release();
         }
         VariantClear(&v);
-        root->Release();
     }
+    // Widgets/news cards are ordinary buttons in the taskbar tree.
+    {
+        VARIANT ct;
+        VariantInit(&ct);
+        ct.vt = VT_I4;
+        ct.lVal = UIA_ButtonControlTypeId;
+        IUIAutomationCondition* cond = nullptr;
+        if (SUCCEEDED(uia->CreatePropertyCondition(UIA_ControlTypePropertyId, ct, &cond)) && cond) {
+            collect(cond);
+            cond->Release();
+        }
+    }
+}
+
+BOOL CALLBACK CollectHwndContent(HWND h, LPARAM lp) {
+    auto* out = reinterpret_cast<std::vector<RECT>*>(lp);
+    if (!IsWindowVisible(h)) return TRUE;
+    wchar_t cls[128]{};
+    GetClassNameW(h, cls, 128);
+    if (!wcscmp(cls, L"Windows.UI.Composition.DesktopWindowContentBridge") ||
+        !wcscmp(cls, L"Windows.UI.Input.InputSite.WindowClass") ||
+        !wcscmp(cls, L"TrayNotifyWnd") || !wcscmp(cls, L"TrayDummySearchControl") ||
+        !wcscmp(cls, L"ReBarWindow32") || !wcscmp(cls, L"MSTaskSwWClass") ||
+        !wcscmp(cls, L"MSTaskListWClass") || !wcscmp(cls, L"WorkerW") ||
+        !wcscmp(cls, L"TrayWindow"))
+        return TRUE;
+    RECT r{};
+    if (GetWindowRect(h, &r) && r.right > r.left && (r.bottom - r.top) > 0 &&
+        (r.bottom - r.top) <= 80 && r.left >= 0)
+        out->push_back(r);
+    return TRUE;
+}
+
+void MergeIntervals(std::vector<RECT>& v) {
+    std::sort(v.begin(), v.end(), [](const RECT& a, const RECT& b) { return a.left < b.left; });
+    std::vector<RECT> merged;
+    for (const auto& r : v) {
+        if (!merged.empty() && r.left <= merged.back().right + 4)
+            merged.back().right = std::max(merged.back().right, r.right);
+        else
+            merged.push_back(r);
+    }
+    v.swap(merged);
+}
+
+void PublishContent(const std::vector<RECT>& content) {
+    std::lock_guard<std::mutex> lock(g_contentMutex);
+    g_contentCount = std::min((int)content.size(), kMaxContent);
+    for (int i = 0; i < g_contentCount; i++) g_content[i] = content[i];
 }
 
 DWORD WINAPI ButtonWatcher(LPVOID) {
@@ -289,20 +322,50 @@ DWORD WINAPI ButtonWatcher(LPVOID) {
     IUIAutomation* uia = nullptr;
     CoCreateInstance(CLSID_CUIAutomation, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&uia));
     for (;;) {
-        LONG l = 0, r = 0, s = 0;
-        ReadTaskbarButtons(uia, l, r, s);
-        const bool changed = g_buttonLeft.load() != l || g_buttonRight.load() != r ||
-                             g_startLeft.load() != s;
-        g_buttonLeft.store(l);
-        g_buttonRight.store(r);
-        g_startLeft.store(s);
-        if (changed && g.pill) PostMessageW(g.pill, WM_APP_REPOSITION, 0, 0);
+        HWND taskbar = FindWindowW(L"Shell_TrayWnd", nullptr);
+        std::vector<RECT> content;
+        if (taskbar) EnumChildWindows(taskbar, CollectHwndContent, reinterpret_cast<LPARAM>(&content));
+        MergeIntervals(content);
+        PublishContent(content);
+        if (g.pill) PostMessageW(g.pill, WM_APP_REPOSITION, 0, 0);
 
-        // Query often only while the buttons are close to the tray; otherwise back off.
+        // XAML content (app buttons, Start). Published separately so a slow provider cannot keep
+        // the toolbar rectangles from being applied.
+        if (uia && taskbar) {
+            RECT bar{}, tray{};
+            GetWindowRect(taskbar, &bar);
+            HWND notify = FindWindowExW(taskbar, nullptr, L"TrayNotifyWnd", nullptr);
+            if (notify) GetWindowRect(notify, &tray);
+            const LONG trayLeft = notify ? tray.left : bar.right;
+            IUIAutomationElement* root = nullptr;
+            if (SUCCEEDED(uia->GetRootElement(&root)) && root) {
+                VARIANT v;
+                VariantInit(&v);
+                v.vt = VT_BSTR;
+                v.bstrVal = SysAllocString(L"Shell_TrayWnd");
+                IUIAutomationCondition* cond = nullptr;
+                if (SUCCEEDED(uia->CreatePropertyCondition(UIA_ClassNamePropertyId, v, &cond)) && cond) {
+                    IUIAutomationElement* barElement = nullptr;
+                    if (SUCCEEDED(root->FindFirst(TreeScope_Children, cond, &barElement)) && barElement) {
+                        std::vector<RECT> all = content;
+                        CollectUiaContent(uia, barElement, trayLeft, all);
+                        MergeIntervals(all);
+                        PublishContent(all);
+                        if (g.pill) PostMessageW(g.pill, WM_APP_REPOSITION, 0, 0);
+                        barElement->Release();
+                    }
+                    cond->Release();
+                }
+                VariantClear(&v);
+                root->Release();
+            }
+        }
+
+        // Query often only while the content comes close to the tray; otherwise back off.
         DWORD interval = 20000;
         RECT bar{};
-        HWND taskbar = FindWindowW(L"Shell_TrayWnd", nullptr);
-        if (taskbar && GetWindowRect(taskbar, &bar) && r > 0 && r > bar.right - 700)
+        if (taskbar && GetWindowRect(taskbar, &bar) && !content.empty() &&
+            content.back().right > bar.right - 700)
             interval = 2000;
         if (WaitForSingleObject(g_buttonStop, interval) == WAIT_OBJECT_0) break;
     }
@@ -606,18 +669,25 @@ void RenderPill() {
     int px = notifyRect.left - width - (int)std::lround(6 * g.scale);
     int py = barRect.top;
     const int edgeGap = (int)std::lround(6 * g.scale);
-    const LONG appLeft = g_buttonLeft.load(), appRight = g_buttonRight.load(), startLeft = g_startLeft.load();
-    if (appLeft > 0 && appRight > 0 && px < appRight + edgeGap) {
-        // The taskbar buttons reach into our spot: step left of the group, but not over Start.
-        int alt = (int)appLeft - width - edgeGap;
-        if (startLeft > 0 && alt + width > startLeft) alt = (int)startLeft - width - edgeGap;
-        if (alt >= barRect.left + 8) {
-            px = alt;
-        } else {
-            // No horizontal room at all: float just above the taskbar, still near the tray.
-            py = barRect.top - height - (int)std::lround(4 * g.scale);
-            px = notifyRect.left - width - edgeGap;
+    std::vector<RECT> content;
+    {
+        std::lock_guard<std::mutex> lock(g_contentMutex);
+        content.assign(g_content, g_content + g_contentCount);
+    }
+    for (int pass = 0; pass < 8; pass++) {
+        bool moved = false;
+        for (const auto& r : content) {
+            if (px < r.right + edgeGap && px + width > r.left - edgeGap) {
+                px = r.left - width - edgeGap;
+                moved = true;
+            }
         }
+        if (!moved) break;
+    }
+    if (px < barRect.left + 8) {
+        // No horizontal room at all: float just above the taskbar, still near the tray.
+        py = barRect.top - height - (int)std::lround(4 * g.scale);
+        px = notifyRect.left - width - edgeGap;
     }
     if (px < barRect.left + 8) return;
     g.pillRect = { px, py, px + width, py + height };
@@ -750,7 +820,11 @@ void RenderPanel() {
     if (taskbar && tray) {
         GetWindowRect(taskbar, &bar);
         GetWindowRect(tray, &notify);
-        panelX = notify.right - width - (int)std::lround(6 * g.scale);
+        const int naturalPillRight = notify.left - (int)std::lround(6 * g.scale);
+        const int anchorRight = (g.pillRect.right > 0 && g.pillRect.right < naturalPillRight - 40)
+                                    ? g.pillRect.right
+                                    : notify.right;
+        panelX = anchorRight - width - (int)std::lround(6 * g.scale);
         if (bar.top < 40) panelY = bar.bottom + (int)std::lround(8 * g.scale);
         else panelY = bar.top - height - (int)std::lround(8 * g.scale);
     } else {

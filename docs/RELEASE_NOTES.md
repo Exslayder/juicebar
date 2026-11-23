@@ -17,9 +17,9 @@ another folder), adds a Start menu shortcut and registers an uninstaller.
 - **Cloud Stinger Core Wireless + 7.1** (`0951:170B`): the dongle's feature-report protocol is
   implemented too (connection check, charge code, voltage curves), so this model now reports its
   level and charging state.
-- **No more overlapping taskbar buttons.** The pill watches the taskbar's app buttons and moves
-  left of them when they reach its spot; with no room at all it floats just above the taskbar,
-  still next to the tray.
+- **No more overlapping taskbar content.** The pill watches the taskbar's app buttons, toolbars
+  and widgets and moves left of anything it would cover; with no room at all it floats just above
+  the taskbar, still next to the tray. The panel follows the pill when it had to move.
 - **Experimental HyperX probe.** Any other HyperX dongle (HP `0x03f0` or Kingston `0x0951`) that
   exposes a vendor HID collection is queried with the common protocols; the device is shown only
   when it actually answers. This is how models that are not on the known list get a chance to work
