@@ -769,6 +769,11 @@ bool ForegroundCoversTaskbar() {
         !_wcsicmp(cls, L"Shell_TrayWnd") || !_wcsicmp(cls, L"Shell_SecondaryTrayWnd"))
         return false;   // the desktop or the taskbar itself are never a game
 
+    // A maximized window is not a borderless fullscreen app. On Windows 10, with an auto-hidden
+    // taskbar, its rect covers the whole monitor, which used to make the pill hide for normal
+    // documents.
+    if (IsZoomed(foreground)) return false;
+
     HWND taskbar = FindWindowW(L"Shell_TrayWnd", nullptr);
     if (!taskbar) return false;
     HMONITOR monitor = MonitorFromWindow(taskbar, MONITOR_DEFAULTTONEAREST);
@@ -785,10 +790,38 @@ bool ForegroundCoversTaskbar() {
 
 bool FullscreenApp() {
     QUERY_USER_NOTIFICATION_STATE state{};
-    if (SUCCEEDED(SHQueryUserNotificationState(&state)) &&
-        (state == QUNS_BUSY || state == QUNS_RUNNING_D3D_FULL_SCREEN || state == QUNS_PRESENTATION_MODE))
-        return true;
+    if (SUCCEEDED(SHQueryUserNotificationState(&state))) {
+        // QUNS_BUSY is unreliable on Windows 10 (it also fires for ordinary maximized windows), so
+        // only the two unambiguous states hide the pill; the geometric check covers borderless
+        // fullscreen on both Windows 10 and 11.
+        if (state == QUNS_RUNNING_D3D_FULL_SCREEN || state == QUNS_PRESENTATION_MODE) return true;
+    }
     return ForegroundCoversTaskbar();
+}
+
+std::wstring FullscreenReportImpl() {
+    QUERY_USER_NOTIFICATION_STATE state{};
+    const HRESULT hr = SHQueryUserNotificationState(&state);
+    HWND fg = GetForegroundWindow();
+    std::wstring cls;
+    RECT r{};
+    bool zoomed = false;
+    if (fg) {
+        wchar_t buf[128] = {};
+        GetClassNameW(fg, buf, 128);
+        cls = buf;
+        GetWindowRect(fg, &r);
+        zoomed = IsZoomed(fg) != FALSE;
+    }
+    HWND bar = FindWindowW(L"Shell_TrayWnd", nullptr);
+    RECT barRect{};
+    if (bar) GetWindowRect(bar, &barRect);
+    return Fmt(L"QUNS=%d (hr=0x%08X)\n"
+               L"foreground=%s rect=%ld,%ld,%ld,%ld zoomed=%d\n"
+               L"taskbar rect=%ld,%ld,%ld,%ld covers=%d fullscreen=%d\n",
+               (int)state, (unsigned)hr, cls.c_str(), r.left, r.top, r.right, r.bottom,
+               zoomed ? 1 : 0, barRect.left, barRect.top, barRect.right, barRect.bottom,
+               ForegroundCoversTaskbar() ? 1 : 0, FullscreenApp() ? 1 : 0);
 }
 
 void Animate() {
@@ -936,6 +969,8 @@ HWND CreateLayeredWindow(const wchar_t* cls, WNDPROC proc, const wchar_t* title)
 }
 
 } // namespace
+
+std::wstring FullscreenReport() { return FullscreenReportImpl(); }
 
 // ------------------------------------------------------------------ public
 

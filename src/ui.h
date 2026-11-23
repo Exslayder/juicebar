@@ -29,6 +29,7 @@ void ShowPanelNow();       // --panel and the tray menu
 
 // Diagnostic: which UI font families were resolved (used by --fonts).
 std::wstring FontReport();
+std::wstring FullscreenReport();   // --fullscreen diagnostic
 
 } // namespace ui
 } // namespace ch

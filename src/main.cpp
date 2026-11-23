@@ -52,6 +52,7 @@ struct Options {
     bool quit = false;
     bool noPill = false;
     bool fonts = false;
+    bool fullscreen = false;
 };
 
 struct DeviceState {
@@ -361,6 +362,7 @@ Options ParseOptions(int argc, wchar_t** argv) {    Options o;
         else if (arg == L"--quit") o.quit = true;
         else if (arg == L"--no-pill") o.noPill = true;
         else if (arg == L"--fonts") o.fonts = true;
+        else if (arg == L"--fullscreen") o.fullscreen = true;
         else if (arg == L"--data" && i + 1 < argc) o.dataDir = argv[++i];
         else if (arg == L"--help" || arg == L"-h") {
             Out(Fmt(L"%s %s\n", kAppName, kVersion));
@@ -385,6 +387,10 @@ int Run(int argc, wchar_t** argv) {
     if (options.dump) return RunDump();
     if (options.fonts) {
         Out(ui::FontReport());
+        return 0;
+    }
+    if (options.fullscreen) {
+        Out(ui::FullscreenReport());
         return 0;
     }
 

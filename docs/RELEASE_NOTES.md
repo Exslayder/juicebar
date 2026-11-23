@@ -20,6 +20,8 @@ another folder), adds a Start menu shortcut and registers an uninstaller.
 - **Above the clock, never over the taskbar.** The pill floats just above the clock. Its right
   edge stays in place and it grows left as devices connect, so taskbar buttons, toolbars and the
   news widget stay uncovered; the panel opens above it.
+- **Windows 10 fix.** The pill no longer disappears for ordinary maximized documents: `QUNS_BUSY`
+  and maximized windows are ignored by the fullscreen check now.
 - **Placement setting.** Right-click → Placement lets you choose *Above the clock* (default) or
   *On the taskbar*.
 - **Experimental HyperX probe.** Any other HyperX dongle (HP `0x03f0` or Kingston `0x0951`) that

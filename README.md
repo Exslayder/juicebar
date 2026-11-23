@@ -115,6 +115,7 @@ JuiceBar.exe --once          print detected devices and exit
 JuiceBar.exe --json          same as JSON
 JuiceBar.exe --dump          list HID collections (for adding new devices)
 JuiceBar.exe --fonts         report which UI fonts were resolved
+JuiceBar.exe --fullscreen    report the fullscreen detection and exit
 JuiceBar.exe --panel         start with the panel open
 JuiceBar.exe --no-pill       hide the taskbar pill
 JuiceBar.exe --data <dir>    keep settings and history in <dir> (portable)

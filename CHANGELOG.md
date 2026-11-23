@@ -33,6 +33,13 @@ All notable changes to JuiceBar are documented here. The format follows
 - A stale `ERROR_ALREADY_EXISTS` could make the single-instance check exit the app silently; the
   last error is cleared before `CreateMutex`.
 
+### Fixed
+
+- Windows 10: the pill no longer hides for ordinary maximized documents. Windows 10 reports
+  `QUNS_BUSY` for them, and with an auto-hidden taskbar a maximized window covers the whole
+  monitor; both fooled the fullscreen check. It now ignores `QUNS_BUSY` and maximized windows and
+  relies on the geometric check plus the two unambiguous D3D/presentation states.
+
 ### Changed
 
 - Placement submenu in the right-click menu: *Above the clock* (default) or *On the taskbar*
