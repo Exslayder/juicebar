@@ -6,7 +6,9 @@ and the panel get real per-pixel transparency and rounded edges without a browse
 
 ## Surfaces
 
-- **Pill** — transparent by default; the device glyph and the level sit directly on the taskbar.
+- **Pill** — floats just above the taskbar, right-aligned with the clock. Its right edge is fixed
+  and it grows to the left as devices connect, so it stays clear of taskbar buttons, toolbars and
+  widgets. Transparent by default; the device glyph and the level sit on that surface.
   Hover paints a single very light wash (white at 12/255 on a dark taskbar, black at 10/255 on a
   light one) over the full strip, square, no outline — the same visual weight as the Explorer tray
   hover. Clicking toggles the panel; right-clicking opens the menu.

@@ -17,6 +17,9 @@ another folder), adds a Start menu shortcut and registers an uninstaller.
 - **Cloud Stinger Core Wireless + 7.1** (`0951:170B`): the dongle's feature-report protocol is
   implemented too (connection check, charge code, voltage curves), so this model now reports its
   level and charging state.
+- **Above the clock, never over the taskbar.** The pill floats just above the clock. Its right
+  edge stays in place and it grows left as devices connect, so taskbar buttons, toolbars and the
+  news widget stay uncovered; the panel opens above it.
 - **Experimental HyperX probe.** Any other HyperX dongle (HP `0x03f0` or Kingston `0x0951`) that
   exposes a vendor HID collection is queried with the common protocols; the device is shown only
   when it actually answers. This is how models that are not on the known list get a chance to work

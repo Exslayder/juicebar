@@ -29,6 +29,8 @@ measurement, and it is labelled while the data is still thin.
 - **All native, no Chromium.** ~1.8 MB exe: the pill, the panel, device polling and history are
   plain Win32 + GDI+. No WebView2, no Electron, no background Chromium processes. Idle CPU is
   0 ms/s and the working set is ~24 MB.
+- **Sits above the clock.** The pill floats just above the clock and grows to the left as devices
+  connect, so it never covers taskbar buttons, toolbars or widgets.
 - **Starts with Windows.** Enabled on the first run; a checkbox in the right-click menu turns it
   off again (a single `HKCU\…\Run` value, no service, no admin rights).
 - **Follows Windows.** Light/dark theme comes from the taskbar and updates live; 100–200 % DPI

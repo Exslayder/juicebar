@@ -35,6 +35,8 @@ All notable changes to JuiceBar are documented here. The format follows
 
 ### Changed
 
+- The pill now floats just above the clock, right-aligned; it grows to the left as devices connect,
+  so it never covers taskbar buttons, toolbars or the news widget. The panel opens above the pill.
 - Device glyphs are Material Symbols Rounded (Apache-2.0) in the pill and the panel; battery marks
   stay Fluent. Charging is green, low battery red, sleeping devices dimmed.
 - README badges and repository topics; the installer's folder choice is documented.
