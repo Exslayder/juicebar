@@ -39,6 +39,8 @@ enum MenuId : UINT {
     ID_REFRESH = 100,
     ID_AUTOSTART = 150,
     ID_QUIT = 160,
+    ID_PLACE_CLOCK = 170,
+    ID_PLACE_TASKBAR = 171,
 };
 
 struct Options {
@@ -131,6 +133,16 @@ void ShowMenu(HWND owner) {
     AppendMenuW(menu, MF_STRING, ID_REFRESH, T(L"Обновить", L"Refresh"));
     AppendMenuW(menu, MF_STRING | (app.settings.autoStart ? MF_CHECKED : MF_UNCHECKED), ID_AUTOSTART,
                 T(L"Автозагрузка", L"Start with Windows"));
+
+    HMENU placement = CreatePopupMenu();
+    AppendMenuW(placement, MF_STRING | (app.settings.pillPlacement == 0 ? MF_CHECKED : 0), ID_PLACE_CLOCK,
+                T(L"Над часами", L"Above the clock"));
+    AppendMenuW(placement, MF_STRING | (app.settings.pillPlacement == 1 ? MF_CHECKED : 0), ID_PLACE_TASKBAR,
+                T(L"На панели задач", L"On the taskbar"));
+    HMENU settingsMenu = CreatePopupMenu();
+    AppendMenuW(settingsMenu, MF_POPUP, (UINT_PTR)placement, T(L"Расположение", L"Placement"));
+    AppendMenuW(menu, MF_POPUP, (UINT_PTR)settingsMenu, T(L"Настройки", L"Settings"));
+
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, ID_QUIT, T(L"Выход", L"Exit"));
 
@@ -155,6 +167,12 @@ void HandleCommand(UINT id) {
         app.settings.autoStart = !app.settings.autoStart;
         EnsureAutostart(app.settings.autoStart);
         SaveSettingsNow();
+        return;
+    }
+    if (id == ID_PLACE_CLOCK || id == ID_PLACE_TASKBAR) {
+        app.settings.pillPlacement = id == ID_PLACE_TASKBAR ? 1 : 0;
+        SaveSettingsNow();
+        ui::SetSettings(app.settings);
         return;
     }
     if (id == ID_QUIT) PostMessageW(app.hwnd, WM_CLOSE, 0, 0);

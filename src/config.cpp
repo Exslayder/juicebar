@@ -111,6 +111,7 @@ Settings LoadSettings(const std::wstring& file) {
         else if (key == L"show_pill") s.showPill = ToInt(value, 1) != 0;
         else if (key == L"dim_sleeping") s.dimSleeping = ToInt(value, 1) != 0;
         else if (key == L"autostart") s.autoStart = ToInt(value, 1) != 0;
+        else if (key == L"pill_placement") s.pillPlacement = ToInt(value, 0);
         else if (key == L"theme") s.theme = ToInt(value, 0);
         else if (key == L"accent") s.accent = ToInt(value, 0);
         else if (key == L"language") s.language = ToInt(value, 0);
@@ -121,6 +122,7 @@ Settings LoadSettings(const std::wstring& file) {
     s.theme = 0;
     s.accent = 0;
     s.language = std::clamp(s.language, 0, 2);
+    s.pillPlacement = std::clamp(s.pillPlacement, 0, 1);
     return s;
 }
 
@@ -132,6 +134,7 @@ bool SaveSettings(const std::wstring& file, const Settings& s) {
     text += std::string("show_pill=") + (s.showPill ? "1" : "0") + "\n";
     text += std::string("dim_sleeping=") + (s.dimSleeping ? "1" : "0") + "\n";
     text += std::string("autostart=") + (s.autoStart ? "1" : "0") + "\n";
+    text += "pill_placement=" + std::to_string(std::clamp(s.pillPlacement, 0, 1)) + "\n";
     text += "theme=" + std::to_string(s.theme) + "\n";
     text += "accent=" + std::to_string(s.accent) + "\n";
     text += "language=" + std::to_string(s.language) + "\n";

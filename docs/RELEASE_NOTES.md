@@ -20,6 +20,8 @@ another folder), adds a Start menu shortcut and registers an uninstaller.
 - **Above the clock, never over the taskbar.** The pill floats just above the clock. Its right
   edge stays in place and it grows left as devices connect, so taskbar buttons, toolbars and the
   news widget stay uncovered; the panel opens above it.
+- **Placement setting.** Right-click → Settings → Placement lets you choose *Above the clock*
+  (default) or *On the taskbar*.
 - **Experimental HyperX probe.** Any other HyperX dongle (HP `0x03f0` or Kingston `0x0951`) that
   exposes a vendor HID collection is queried with the common protocols; the device is shown only
   when it actually answers. This is how models that are not on the known list get a chance to work

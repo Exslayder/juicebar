@@ -489,12 +489,20 @@ void RenderPill() {
 
     }
 
-    // Float just above the clock; the right edge stays put and the pill grows to the left as
-    // devices connect, so it never covers taskbar buttons, toolbars or widgets.
-    const int pillRight = notifyRect.right - (int)std::lround(12 * g.scale);
-    const int px = pillRight - width;
-    const int py = barRect.top - height - (int)std::lround(4 * g.scale);
-    if (px < barRect.left + 8) return;
+    int px = 0, py = 0;
+    if (g.settings->pillPlacement == 1) {
+        // On the taskbar, left of the tray (the classic position).
+        px = notifyRect.left - width - (int)std::lround(6 * g.scale);
+        py = barRect.top;
+        if (px < barRect.left + 80) return;   // crowded taskbar: do not cover app buttons
+    } else {
+        // Float just above the clock; the right edge stays put and the pill grows to the left as
+        // devices connect, so it never covers taskbar buttons, toolbars or widgets.
+        const int pillRight = notifyRect.right - (int)std::lround(12 * g.scale);
+        px = pillRight - width;
+        py = barRect.top - height - (int)std::lround(4 * g.scale);
+        if (px < barRect.left + 8) return;
+    }
     g.pillRect = { px, py, px + width, py + height };
     g.pillH = height;
     canvas.Present(g.pill, px, py);
@@ -624,12 +632,18 @@ void RenderPanel() {
     if (taskbar && tray) {
         GetWindowRect(taskbar, &bar);
         GetWindowRect(tray, &notify);
-        const int anchorRight = g.pillRect.right > 0 ? g.pillRect.right : notify.right;
-        panelX = anchorRight - width - (int)std::lround(6 * g.scale);
-        if (bar.top < 40) panelY = bar.bottom + (int)std::lround(8 * g.scale);
-        else if (g.pillRect.top > 0 && g.pillRect.top < bar.top)
-            panelY = g.pillRect.top - height - (int)std::lround(8 * g.scale);
-        else panelY = bar.top - height - (int)std::lround(8 * g.scale);
+        if (g.settings->pillPlacement == 1) {
+            panelX = notify.right - width - (int)std::lround(6 * g.scale);
+            if (bar.top < 40) panelY = bar.bottom + (int)std::lround(8 * g.scale);
+            else panelY = bar.top - height - (int)std::lround(8 * g.scale);
+        } else {
+            const int anchorRight = g.pillRect.right > 0 ? g.pillRect.right : notify.right;
+            panelX = anchorRight - width - (int)std::lround(6 * g.scale);
+            if (bar.top < 40) panelY = bar.bottom + (int)std::lround(8 * g.scale);
+            else if (g.pillRect.top > 0 && g.pillRect.top < bar.top)
+                panelY = g.pillRect.top - height - (int)std::lround(8 * g.scale);
+            else panelY = bar.top - height - (int)std::lround(8 * g.scale);
+        }
     } else {
         RECT work{};
         SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
@@ -1116,6 +1130,17 @@ void Tick() {
         if (!CursorInside(g.panel, panelRect) && !CursorInside(g.pill, g.pillRect))
             HidePanelInternal();
     }
+}
+
+void SetSettings(const Settings& settings) {
+    if (!g.settings) return;
+    *g.settings = settings;
+    BuildTheme();
+    RebuildFonts();
+    if (g.settings->showPill) ShowWindow(g.pill, SW_SHOWNOACTIVATE);
+    else ShowWindow(g.pill, SW_HIDE);
+    RenderPill();
+    if (g.visible) RenderPanel();
 }
 
 void OnSystemSettingsChanged() {

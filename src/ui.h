@@ -21,6 +21,7 @@ bool Init(HINSTANCE inst, Settings* settings, Hooks hooks, const std::wstring& d
 void Shutdown();
 
 void SetCards(std::vector<Card> cards, int64_t polledAt);
+void SetSettings(const Settings& settings);
 
 void Tick();               // cheap: z-order, taskbar geometry, auto-hide
 void OnSystemSettingsChanged();

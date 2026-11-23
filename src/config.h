@@ -8,6 +8,7 @@ struct Settings {
     bool showPill = true;
     bool dimSleeping = true;
     bool autoStart = true;
+    int pillPlacement = 0;   // 0 above the clock, 1 on the taskbar
     int theme = 0;      // 0 auto, 1 dark, 2 light
     int accent = 0;     // index into ui::Accents()
     int language = 0;   // 0 auto, 1 ru, 2 en
