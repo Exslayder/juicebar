@@ -35,8 +35,6 @@ All notable changes to JuiceBar are documented here. The format follows
 
 ### Changed
 
-- The pill tracks the taskbar's app buttons (UI Automation) and steps left of them when the
-  taskbar is crowded; if there is no room, it floats just above the taskbar near the tray.
 - Device glyphs are Material Symbols Rounded (Apache-2.0) in the pill and the panel; battery marks
   stay Fluent. Charging is green, low battery red, sleeping devices dimmed.
 - README badges and repository topics; the installer's folder choice is documented.

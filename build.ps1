@@ -41,7 +41,7 @@ $flags = @(
 )
 $libs = @(
     "-lgdiplus", "-lhid", "-lsetupapi", "-lcfgmgr32", "-lole32", "-loleaut32",
-    "-lcomctl32", "-luiautomationcore", "-lgdi32", "-lshell32", "-lshlwapi", "-ladvapi32", "-luuid", "-luser32", "-ldwmapi", "-ldbghelp"
+    "-lcomctl32", "-lgdi32", "-lshell32", "-lshlwapi", "-ladvapi32", "-luuid", "-luser32", "-ldwmapi", "-ldbghelp"
 )
 
 if ($VerboseOutput) { Write-Host "Compiling $($sources.Count) files..." }
