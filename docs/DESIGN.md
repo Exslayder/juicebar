@@ -58,6 +58,10 @@ The pill is a layered top-level window, because layered **child** windows inside
 cannot be clicked on the Windows 11 taskbar (the shell's XAML island sits above them and swallows
 input) and Windows offers no supported way to pin a popup above its own topmost taskbar.
 
+The pill also watches the taskbar's app buttons through UI Automation (Windows 11 renders them as
+XAML, so their bounds are not available as window rectangles) and moves left of the button group
+when it would overlap; if there is no room, it floats just above the taskbar near the tray.
+
 The pill therefore walks the z-order list once per second (read-only) and calls
 `SetWindowPos(HWND_TOPMOST)` **only** when the taskbar is actually above it — which happens after a
 screenshot or a taskbar focus change. In steady state the app makes no z-order calls at all and no

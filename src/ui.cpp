@@ -9,6 +9,9 @@
 #include <windowsx.h>
 #include <shlwapi.h>
 #include <dwmapi.h>
+#include <UIAutomation.h>
+#include <oleauto.h>
+#include <atomic>
 
 #include <algorithm>
 #include <cmath>
@@ -20,6 +23,8 @@ using namespace Gdiplus;
 namespace ch {
 namespace ui {
 namespace {
+
+constexpr UINT WM_APP_REPOSITION = WM_APP + 10;
 
 
 constexpr UINT WM_APP_REFRESH_UI = WM_APP + 40;
@@ -207,6 +212,104 @@ struct State {
     bool iconFontFluent = true;
     bool uiFontVariable = true;
 } g;
+
+
+// Taskbar app buttons are XAML on Windows 11, so their bounds are only available through UI
+// Automation. A small watcher keeps the app-button group and the Start button, letting the pill
+// step left of the buttons when the taskbar is crowded.
+HANDLE g_buttonStop = nullptr;
+HANDLE g_buttonThread = nullptr;
+std::atomic<LONG> g_buttonLeft{ 0 }, g_buttonRight{ 0 }, g_startLeft{ 0 };
+
+void ReadTaskbarButtons(IUIAutomation* uia, LONG& left, LONG& right, LONG& startLeft) {
+    left = right = startLeft = 0;
+    if (!uia) return;
+    IUIAutomationElement* root = nullptr;
+    if (SUCCEEDED(uia->GetRootElement(&root)) && root) {
+        VARIANT v;
+        VariantInit(&v);
+        v.vt = VT_BSTR;
+        v.bstrVal = SysAllocString(L"Shell_TrayWnd");
+        IUIAutomationCondition* cond = nullptr;
+        if (SUCCEEDED(uia->CreatePropertyCondition(UIA_ClassNamePropertyId, v, &cond)) && cond) {
+            IUIAutomationElement* bar = nullptr;
+            if (SUCCEEDED(root->FindFirst(TreeScope_Children, cond, &bar)) && bar) {
+                VariantClear(&v);
+                v.vt = VT_BSTR;
+                v.bstrVal = SysAllocString(L"Taskbar.TaskListButtonAutomationPeer");
+                cond->Release();
+                cond = nullptr;
+                if (SUCCEEDED(uia->CreatePropertyCondition(UIA_ClassNamePropertyId, v, &cond)) && cond) {
+                    IUIAutomationElementArray* arr = nullptr;
+                    if (SUCCEEDED(bar->FindAll(TreeScope_Descendants, cond, &arr)) && arr) {
+                        int len = 0;
+                        arr->get_Length(&len);
+                        for (int i = 0; i < len; i++) {
+                            IUIAutomationElement* e = nullptr;
+                            if (FAILED(arr->GetElement(i, &e)) || !e) continue;
+                            RECT r{};
+                            if (SUCCEEDED(e->get_CurrentBoundingRectangle(&r))) {
+                                if (left == 0 || r.left < left) left = r.left;
+                                if (r.right > right) right = r.right;
+                            }
+                            e->Release();
+                        }
+                        arr->Release();
+                    }
+                }
+                VariantClear(&v);
+
+                VariantInit(&v);
+                v.vt = VT_BSTR;
+                v.bstrVal = SysAllocString(L"ToggleButton");
+                if (cond) cond->Release();
+                cond = nullptr;
+                if (SUCCEEDED(uia->CreatePropertyCondition(UIA_ClassNamePropertyId, v, &cond)) && cond) {
+                    IUIAutomationElement* start = nullptr;
+                    if (SUCCEEDED(bar->FindFirst(TreeScope_Descendants, cond, &start)) && start) {
+                        RECT r{};
+                        if (SUCCEEDED(start->get_CurrentBoundingRectangle(&r))) startLeft = r.left;
+                        start->Release();
+                    }
+                    cond->Release();
+                }
+                VariantClear(&v);
+                bar->Release();
+            } else {
+                cond->Release();
+            }
+        }
+        VariantClear(&v);
+        root->Release();
+    }
+}
+
+DWORD WINAPI ButtonWatcher(LPVOID) {
+    if (FAILED(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED))) return 0;
+    IUIAutomation* uia = nullptr;
+    CoCreateInstance(CLSID_CUIAutomation, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&uia));
+    for (;;) {
+        LONG l = 0, r = 0, s = 0;
+        ReadTaskbarButtons(uia, l, r, s);
+        const bool changed = g_buttonLeft.load() != l || g_buttonRight.load() != r ||
+                             g_startLeft.load() != s;
+        g_buttonLeft.store(l);
+        g_buttonRight.store(r);
+        g_startLeft.store(s);
+        if (changed && g.pill) PostMessageW(g.pill, WM_APP_REPOSITION, 0, 0);
+
+        // Query often only while the buttons are close to the tray; otherwise back off.
+        DWORD interval = 20000;
+        RECT bar{};
+        HWND taskbar = FindWindowW(L"Shell_TrayWnd", nullptr);
+        if (taskbar && GetWindowRect(taskbar, &bar) && r > 0 && r > bar.right - 700)
+            interval = 2000;
+        if (WaitForSingleObject(g_buttonStop, interval) == WAIT_OBJECT_0) break;
+    }
+    if (uia) uia->Release();
+    CoUninitialize();
+    return 0;
+}
 
 // ------------------------------------------------------------------ helpers
 
@@ -500,9 +603,23 @@ void RenderPill() {
 
     }
 
-    const int px = notifyRect.left - width - (int)std::lround(6 * g.scale);
-    const int py = barRect.top;
-    if (px < barRect.left + 80) return;   // crowded taskbar: do not cover app buttons
+    int px = notifyRect.left - width - (int)std::lround(6 * g.scale);
+    int py = barRect.top;
+    const int edgeGap = (int)std::lround(6 * g.scale);
+    const LONG appLeft = g_buttonLeft.load(), appRight = g_buttonRight.load(), startLeft = g_startLeft.load();
+    if (appLeft > 0 && appRight > 0 && px < appRight + edgeGap) {
+        // The taskbar buttons reach into our spot: step left of the group, but not over Start.
+        int alt = (int)appLeft - width - edgeGap;
+        if (startLeft > 0 && alt + width > startLeft) alt = (int)startLeft - width - edgeGap;
+        if (alt >= barRect.left + 8) {
+            px = alt;
+        } else {
+            // No horizontal room at all: float just above the taskbar, still near the tray.
+            py = barRect.top - height - (int)std::lround(4 * g.scale);
+            px = notifyRect.left - width - edgeGap;
+        }
+    }
+    if (px < barRect.left + 8) return;
     g.pillRect = { px, py, px + width, py + height };
     g.pillW = width;
     g.pillH = height;
@@ -836,6 +953,10 @@ void Animate() {
 // ------------------------------------------------------------------ window procs
 
 LRESULT CALLBACK PillProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
+    if (msg == WM_APP_REPOSITION) {
+        RenderPill();
+        return 0;
+    }
     switch (msg) {
         case WM_MOUSEMOVE:
             if (!g.pillHover) {
@@ -998,6 +1119,9 @@ bool Init(HINSTANCE inst, Settings* settings, Hooks hooks, const std::wstring& d
 
     RebuildFonts();
 
+    g_buttonStop = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    if (g_buttonStop) g_buttonThread = CreateThread(nullptr, 0, ButtonWatcher, nullptr, 0, nullptr);
+
     ShowWindow(g.pill, SW_SHOWNOACTIVATE);
     RenderPill();
     return true;
@@ -1039,6 +1163,16 @@ void ClearLayered(HWND wnd) {
 }
 
 void Shutdown() {
+    if (g_buttonStop) SetEvent(g_buttonStop);
+    if (g_buttonThread) {
+        WaitForSingleObject(g_buttonThread, 2000);
+        CloseHandle(g_buttonThread);
+        g_buttonThread = nullptr;
+    }
+    if (g_buttonStop) {
+        CloseHandle(g_buttonStop);
+        g_buttonStop = nullptr;
+    }
     if (g.pill) {
         ClearLayered(g.pill);
         ShowWindow(g.pill, SW_HIDE);
