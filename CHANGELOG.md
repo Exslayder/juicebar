@@ -4,6 +4,14 @@ All notable changes to JuiceBar are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] — 2026-11-23
+
+### Fixed
+
+- The calibration countdown no longer stays at "15 min": it uses the observed sample span and
+  decreases with every poll. A device with a single sample shows "Calibrating" until a second
+  sample arrives.
+
 ## [1.0.2] — 2026-11-23
 
 ### Added

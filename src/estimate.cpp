@@ -16,7 +16,7 @@ struct Fit {
 
 Fit FitTrailing(const std::vector<Sample>& points, bool charging) {
     Fit fit;
-    if (points.size() < 4) return fit;
+    if (points.empty()) return fit;
 
     const int64_t kMaxGap = 25 * 60;  // a longer gap means the device (or the PC) was off
     size_t start = points.size() - 1;
@@ -31,10 +31,12 @@ Fit FitTrailing(const std::vector<Sample>& points, bool charging) {
         start--;
     }
 
+    // Report the trailing run even when it is still too short to fit, so the caller can show a
+    // countdown instead of a fixed "15 min" that never moves.
     const size_t n = points.size() - start;
-    if (n < 4) return fit;
-    const int64_t span = points.back().t - points[start].t;
-    if (span < 15 * 60) return fit;
+    fit.n = (int)n;
+    fit.span = points.back().t - points[start].t;
+    if (n < 4 || fit.span < 15 * 60) return fit;
 
     // Least squares on hours/percent; the intercept absorbs the level at window start.
     const double x0 = (double)points[start].t;
@@ -53,8 +55,6 @@ Fit FitTrailing(const std::vector<Sample>& points, bool charging) {
 
     fit.ok = true;
     fit.slope = (count * sxy - sx * sy) / denom;
-    fit.n = (int)n;
-    fit.span = span;
     fit.drop = points[start].percent - points.back().percent;
     return fit;
 }

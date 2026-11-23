@@ -73,6 +73,25 @@ void TestLearning() {
     Check(f.minutes < 0, "no number is shown while learning");
 }
 
+void TestLearningCountdown() {
+    printf("learning countdown\n");
+    const int64_t now = 1700000000;
+    std::vector<Sample> series;
+    series.push_back(MakeSample(L"test:2", now - 10 * 60, 90));
+    series.push_back(MakeSample(L"test:2", now - 5 * 60, 90));
+    series.push_back(MakeSample(L"test:2", now - 60, 90));
+    Forecast f = Estimate(series, 90, false, now - 30);
+    Check(f.state == ForecastState::Learning, "10 min of data is still learning");
+    Check(f.needSec > 0 && f.needSec < 10 * 60, "the countdown reflects the observed span");
+    Check(f.needSec <= 15 * 60, "the countdown never exceeds the calibration window");
+
+    // A sample 16 minutes back completes the window; a steady level is then flat, not an endless
+    // calibration.
+    series.push_back(MakeSample(L"test:2", now - 16 * 60, 90));
+    Forecast g = Estimate(series, 90, false, now);
+    Check(g.state != ForecastState::Learning, "15 min of data finishes the calibration");
+}
+
 void TestDischargeForecast() {
     printf("discharge forecast\n");
     const int64_t now = 1700000000;
@@ -180,6 +199,7 @@ int main() {
     printf("ChargeHover tests\n");
     TestVoltageCurve();
     TestLearning();
+    TestLearningCountdown();
     TestDischargeForecast();
     TestSteepDrain();
     TestFlat();

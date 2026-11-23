@@ -1,8 +1,8 @@
 ; JuiceBar installer (Inno Setup 6+).
-; Build with installer\build-installer.ps1 -Version 1.0.2
+; Build with installer\build-installer.ps1 -Version 1.0.3
 
 #ifndef MyVersion
-  #define MyVersion "1.0.2"
+  #define MyVersion "1.0.3"
 #endif
 
 #define MyAppName "JuiceBar"

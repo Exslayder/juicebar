@@ -344,7 +344,8 @@ std::wstring StatusLine(const Card& card) {
         case ForecastState::Flat:
             return Tr(L"Расход стабилен", L"Drain is steady");
         case ForecastState::Learning:
-            if (f.needSec > 0)
+            // A single point has no observed span yet; do not claim a fixed "15 min" forever.
+            if (f.needSec > 0 && f.samples > 1)
                 return Tr(L"Калибровка · ещё ", L"Calibrating · ") + FormatSpan((f.needSec + 59) / 60);
             return Tr(L"Калибровка", L"Calibrating");
         case ForecastState::NoData:
