@@ -1,7 +1,8 @@
 # JuiceBar
 
-[![release](https://img.shields.io/github/v/release/Exslayder/juicebar?label=release)](https://github.com/Exslayder/juicebar/releases/latest)
+[![release](https://img.shields.io/github/v/release/Exslayder/juicebar.svg?label=release)](https://github.com/Exslayder/juicebar/releases/latest)
 [![build](https://github.com/Exslayder/juicebar/actions/workflows/release.yml/badge.svg)](https://github.com/Exslayder/juicebar/actions/workflows/release.yml)
+[![UI](https://img.shields.io/badge/UI-RU%20%7C%20EN-blue)](#languages)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D4)](#requirements)
 [![telemetry](https://img.shields.io/badge/telemetry-none-brightgreen)](#data--privacy)
@@ -9,7 +10,7 @@
 Battery level **and remaining time** for wireless mice, headsets and controllers — right on the
 Windows taskbar, without vendor software.
 
-![JuiceBar panel in English](docs/screenshot.png)
+![JuiceBar panel and pill in English](docs/screenshot.png)
 
 A small pill floats above the clock (or sits on the taskbar, if you prefer) and shows the real level
 reported by each device. Click it and a compact panel opens with the device name, the estimated time
@@ -53,6 +54,13 @@ tests, then produces the installer.
 To remove the app, use *Settings → Apps → Installed apps → JuiceBar* (or *Apps & features* on
 Windows 10) or the uninstaller in the install folder. Your settings and history are kept; delete
 `%APPDATA%\JuiceBar` and `%LOCALAPPDATA%\JuiceBar` to remove them too.
+
+## Placement
+
+The pill floats above the clock by default. Right-click → Placement → *On the taskbar* puts it
+left of the tray; *Above the clock* brings it back. Both are shown below.
+
+![Pill placement](docs/placement.png)
 
 ## Supported devices
 
