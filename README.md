@@ -2,7 +2,7 @@
 
 [![release](https://img.shields.io/github/v/release/Exslayder/juicebar.svg?label=release)](https://github.com/Exslayder/juicebar/releases/latest)
 [![build](https://github.com/Exslayder/juicebar/actions/workflows/release.yml/badge.svg)](https://github.com/Exslayder/juicebar/actions/workflows/release.yml)
-[![UI](https://img.shields.io/badge/UI-RU%20%7C%20EN-blue)](#languages)
+[![UI](docs/ui-badge.svg)](#languages)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D4)](#requirements)
 [![telemetry](https://img.shields.io/badge/telemetry-none-brightgreen)](#data--privacy)
