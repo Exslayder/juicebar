@@ -43,6 +43,9 @@ enum MenuId : UINT {
     ID_QUIT = 160,
     ID_PLACE_CLOCK = 170,
     ID_PLACE_TASKBAR = 171,
+    ID_LANG_AUTO = 180,
+    ID_LANG_RU = 181,
+    ID_LANG_EN = 182,
 };
 
 struct Options {
@@ -147,6 +150,15 @@ void ShowMenu(HWND owner) {
                 T(L"На панели задач", L"On the taskbar"));
     AppendMenuW(menu, MF_POPUP, (UINT_PTR)placement, T(L"Расположение", L"Placement"));
 
+    HMENU language = CreatePopupMenu();
+    AppendMenuW(language, MF_STRING | (app.settings.language == 0 ? MF_CHECKED : 0), ID_LANG_AUTO,
+                T(L"Авто", L"Auto"));
+    AppendMenuW(language, MF_STRING | (app.settings.language == 1 ? MF_CHECKED : 0), ID_LANG_RU,
+                L"Русский");
+    AppendMenuW(language, MF_STRING | (app.settings.language == 2 ? MF_CHECKED : 0), ID_LANG_EN,
+                T(L"Английский", L"English"));
+    AppendMenuW(menu, MF_POPUP, (UINT_PTR)language, T(L"Язык", L"Language"));
+
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, ID_QUIT, T(L"Выход", L"Exit"));
 
@@ -182,6 +194,13 @@ void HandleCommand(UINT id) {
     }
     if (id == ID_PLACE_CLOCK || id == ID_PLACE_TASKBAR) {
         app.settings.pillPlacement = id == ID_PLACE_TASKBAR ? 1 : 0;
+        SaveSettingsNow();
+        ui::SetSettings(app.settings);
+        return;
+    }
+    if (id == ID_LANG_AUTO || id == ID_LANG_RU || id == ID_LANG_EN) {
+        app.settings.language = id == ID_LANG_RU ? 1 : id == ID_LANG_EN ? 2 : 0;
+        SetUiLanguage(app.settings.language);
         SaveSettingsNow();
         ui::SetSettings(app.settings);
         return;
@@ -454,6 +473,7 @@ int Run(int argc, wchar_t** argv) {
     app.options = options;
     app.paths = ResolvePaths(options.dataDir);
     app.settings = LoadSettings(app.paths.settingsFile);
+    SetUiLanguage(app.settings.language);
     app.savedShowPill = app.settings.showPill;
     EnsureAutostart(app.settings.autoStart);
     if (options.noPill) app.settings.showPill = false;

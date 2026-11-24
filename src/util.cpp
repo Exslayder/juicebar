@@ -1,10 +1,15 @@
 #include "core.h"
 
+#include <atomic>
 #include <cstdarg>
 #include <cwchar>
 #include <ctime>
 
 namespace ch {
+
+namespace {
+std::atomic<int> gUiLanguage{ 0 };   // 0 system, 1 Russian, 2 English
+}
 
 int64_t NowUnix() { return (int64_t)time(nullptr); }
 
@@ -33,10 +38,15 @@ std::wstring Fmt(const wchar_t* fmt, ...) {
     return buf;
 }
 
+void SetUiLanguage(int language) { gUiLanguage.store(language); }
+
 bool RussianUi() {
+    const int language = gUiLanguage.load();
+    if (language == 1) return true;
+    if (language == 2) return false;
+    // Auto: Russian Windows gets Russian, everything else English.
     LANGID lang = GetUserDefaultUILanguage();
-    return ((lang & 0x3FF) == LANG_RUSSIAN) || ((lang & 0x3FF) == LANG_UKRAINIAN) ||
-           ((lang & 0x3FF) == LANG_BELARUSIAN);
+    return (lang & 0x3FF) == LANG_RUSSIAN;
 }
 
 std::wstring FormatSpan(int minutes) {

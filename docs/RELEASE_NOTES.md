@@ -1,15 +1,22 @@
-# JuiceBar 1.0.4
+# JuiceBar 1.0.5
 
 Battery level **and remaining time** for wireless mice, headsets and controllers — right on the
 Windows taskbar, with no vendor software.
 
 ## Install
 
-Download `JuiceBar-1.0.4-setup.exe` and run it. Per-user installer: no administrator rights, no UAC
+Download `JuiceBar-1.0.5-setup.exe` and run it. Per-user installer: no administrator rights, no UAC
 prompt. By default it installs into `%LOCALAPPDATA%\Programs\JuiceBar` (the wizard lets you choose
 another folder), adds a Start menu shortcut and registers an uninstaller.
 
-## Fixed in this build
+## New in this build
+
+- **Language selection.** Right-click → Language lets you choose *Auto*, *Русский* or *English*.
+  The choice is saved in `settings.ini` and applied immediately: menus, panel labels and duration
+  strings all follow it. *Auto* uses the Windows UI language: Russian Windows uses Russian,
+  everything else English.
+
+## Fixed in 1.0.4
 
 - **Windowed (fullscreen) games.** A maximized borderless window — WoW's *Windowed (Fullscreen)* is
   one — is now detected by its client area instead of being rejected as a maximized document. The

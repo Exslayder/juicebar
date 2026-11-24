@@ -35,11 +35,11 @@ measurement, and it is labelled while the data is still thin.
 - **Starts with Windows.** Enabled on the first run; a checkbox in the right-click menu turns it
   off again (a single `HKCU\…\Run` value, no service, no admin rights).
 - **Follows Windows.** Light/dark theme comes from the taskbar and updates live; 100–200 % DPI
-  aware; Русский / English UI.
+  aware; Русский / English UI, switchable from the menu.
 
 ## Install
 
-Download `JuiceBar-1.0.4-setup.exe` from the latest release and run it. The installer is per-user — no
+Download `JuiceBar-1.0.5-setup.exe` from the latest release and run it. The installer is per-user — no
 administrator rights, no UAC prompt. By default it installs into
 `%LOCALAPPDATA%\Programs\JuiceBar` and adds a Start menu shortcut; the wizard also lets you pick
 another folder (for example `D:\Apps\JuiceBar`).
@@ -111,7 +111,15 @@ Right-click the pill:
 - **Refresh** — poll the devices right now.
 - **Start with Windows** — checked by default; toggles the `HKCU\…\Run` entry.
 - **Placement** — *Above the clock* (default) or *On the taskbar*.
+- **Language** — *Auto* (the Windows language), *Русский* or *English*.
 - **Exit**.
+
+## Languages
+
+The first run follows the Windows UI language: a Russian Windows uses Russian, everything else
+uses English. Right-click → Language lets you switch between *Auto*, *Русский* and *English*; the
+choice is saved in `settings.ini` and applies immediately, including the duration strings in the
+panel.
 
 ## Command line
 
@@ -140,7 +148,7 @@ project (no system installation):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\toolchain.ps1
-powershell -ExecutionPolicy Bypass -File build.ps1 -Version 1.0.4
+powershell -ExecutionPolicy Bypass -File build.ps1 -Version 1.0.5
 powershell -ExecutionPolicy Bypass -File test.ps1
 ```
 
@@ -155,7 +163,7 @@ MinGW archive before extracting it.
 To build the installer you need [Inno Setup 6+](https://jrsoftware.org/isinfo.php):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1 -Version 1.0.4
+powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1 -Version 1.0.5
 ```
 
 The result is `dist\JuiceBar-<version>-setup.exe`.

@@ -62,6 +62,17 @@ void TestVoltageCurve() {
     Check(mid >= 30 && mid <= 40, "3.807 V lands between 30% and 40%");
 }
 
+void TestLanguage() {
+    printf("language\n");
+    SetUiLanguage(1);
+    Check(RussianUi(), "language 1 selects Russian");
+    Check(FormatSpan(60) == L"1 ч", "Russian durations follow the override");
+    SetUiLanguage(2);
+    Check(!RussianUi(), "language 2 selects English");
+    Check(FormatSpan(60) == L"1 h", "English durations follow the override");
+    SetUiLanguage(0);
+}
+
 void TestLearning() {
     printf("learning state\n");
     const int64_t now = 1700000000;
@@ -197,6 +208,7 @@ void TestHistoryIgnoresSillyValues() {
 int main() {
     setvbuf(stdout, nullptr, _IONBF, 0);
     printf("ChargeHover tests\n");
+    TestLanguage();
     TestVoltageCurve();
     TestLearning();
     TestLearningCountdown();

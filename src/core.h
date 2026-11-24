@@ -30,8 +30,11 @@ int64_t NowUnix();
 std::wstring Wide(const std::string& utf8);
 std::string Utf8(const std::wstring& s);
 std::wstring Fmt(const wchar_t* fmt, ...);
-std::wstring FormatSpan(int minutes);   // "3 h 20 min" style, localized later in the UI
+std::wstring FormatSpan(int minutes);   // "3 h 20 min" style, localized by RussianUi()
 std::wstring FormatAgo(int64_t seconds);
+// 0 = follow the Windows UI language, 1 = Russian, 2 = English. Affects FormatSpan/FormatAgo and
+// the UI, so a language chosen from the menu applies everywhere immediately.
+void SetUiLanguage(int language);
 bool RussianUi();
 
 } // namespace ch
