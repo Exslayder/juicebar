@@ -207,7 +207,7 @@ void TestHistoryIgnoresSillyValues() {
 
 int main() {
     setvbuf(stdout, nullptr, _IONBF, 0);
-    printf("ChargeHover tests\n");
+    printf("WattPill tests\n");
     TestLanguage();
     TestVoltageCurve();
     TestLearning();

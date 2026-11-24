@@ -1,6 +1,6 @@
 # Design system
 
-JuiceBar is a native Win32 application. Everything you see is painted by hand on a
+WattPill is a native Win32 application. Everything you see is painted by hand on a
 premultiplied 32-bit surface and pushed to the screen with `UpdateLayeredWindow`, so both the pill
 and the panel get real per-pixel transparency and rounded edges without a browser engine.
 

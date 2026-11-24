@@ -1,4 +1,4 @@
-# Builds JuiceBar.exe with the bundled MinGW-w64 (UCRT) toolchain.
+# Builds WattPill.exe with the bundled MinGW-w64 (UCRT) toolchain.
 # The toolchain lives in .toolchain\mingw64 so nothing is installed system-wide.
 param(
     [string]$Version = "0.1.0",
@@ -50,10 +50,10 @@ $libs = @(
 )
 
 if ($VerboseOutput) { Write-Host "Compiling $($sources.Count) files..." }
-& $gxx @flags $sources (Join-Path $build "app_res.o") -o (Join-Path $build "JuiceBar.exe") @libs
+& $gxx @flags $sources (Join-Path $build "app_res.o") -o (Join-Path $build "WattPill.exe") @libs
 if ($LASTEXITCODE -ne 0) { throw "compilation failed" }
 
-$exe = Get-Item (Join-Path $build "JuiceBar.exe")
+$exe = Get-Item (Join-Path $build "WattPill.exe")
 Write-Host ("Built {0} ({1:N0} KB)" -f $exe.Name, ($exe.Length / 1KB))
 
 if ($Tests) {

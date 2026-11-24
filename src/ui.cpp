@@ -1,4 +1,4 @@
-// JuiceBar UI: a compact taskbar pill plus a hover panel with per-device battery
+// WattPill UI: a compact taskbar pill plus a hover panel with per-device battery
 // forecast. Everything is drawn by hand on a premultiplied 32-bit surface and pushed with
 // UpdateLayeredWindow, so the pill and the panel get real rounded corners and soft alpha.
 #include "ui.h"
@@ -1028,8 +1028,8 @@ bool Init(HINSTANCE inst, Settings* settings, Hooks hooks) {
         g.icons.Load(inst, id);
     for (int i = 0; i <= 10; i++) g.icons.Load(inst, icoBattery0 + i);
 
-    g.panel = CreateLayeredWindow(L"JuiceBarPanel", PanelProc, L"JuiceBar panel");
-    g.pill = CreateLayeredWindow(L"JuiceBarPill", PillProc, L"JuiceBar");
+    g.panel = CreateLayeredWindow(L"WattPillPanel", PanelProc, L"WattPill panel");
+    g.pill = CreateLayeredWindow(L"WattPillPill", PillProc, L"WattPill");
     if (!g.pill || !g.panel) return false;
 
     RebuildFonts();
@@ -1128,7 +1128,7 @@ void Tick() {
     HWND taskbar = FindWindowW(L"Shell_TrayWnd", nullptr);
     if (taskbar) {
         if (!IsWindow(g.pill)) {
-            g.pill = CreateLayeredWindow(L"JuiceBarPill", PillProc, L"JuiceBar");
+            g.pill = CreateLayeredWindow(L"WattPillPill", PillProc, L"WattPill");
             if (!g.pill) return;
             ShowWindow(g.pill, SW_SHOWNOACTIVATE);
             RenderPill();

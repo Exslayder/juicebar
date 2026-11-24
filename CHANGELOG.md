@@ -1,8 +1,24 @@
 # Changelog
 
-All notable changes to JuiceBar are documented here. The format follows
+All notable changes to WattPill are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [2.0.0] — 2026-11-24
+
+### Changed
+
+- Renamed from JuiceBar to WattPill: executable, installer, window classes, autostart value and
+  data folders use the new name.
+- Settings and history from JuiceBar 1.x are copied to `%APPDATA%\WattPill` and
+  `%LOCALAPPDATA%\WattPill` on first launch; the old JuiceBar autostart value is removed.
+- New installer AppId and install folder. The old JuiceBar app can be uninstalled after WattPill is
+  installed.
+
+### Notes
+
+- Functionality is unchanged from JuiceBar 1.0.5: the same device drivers, forecasts, placement
+  options and English/Russian UI.
 
 ## [1.0.5] — 2026-11-24
 

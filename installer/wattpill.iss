@@ -1,16 +1,16 @@
-; JuiceBar installer (Inno Setup 6+).
-; Build with installer\build-installer.ps1 -Version 1.0.5
+; WattPill installer (Inno Setup 6+).
+; Build with installer\build-installer.ps1 -Version 2.0.0
 
 #ifndef MyVersion
-  #define MyVersion "1.0.5"
+  #define MyVersion "2.0.0"
 #endif
 
-#define MyAppName "JuiceBar"
-#define MyAppPublisher "JuiceBar contributors"
-#define MyAppExeName "JuiceBar.exe"
+#define MyAppName "WattPill"
+#define MyAppPublisher "WattPill contributors"
+#define MyAppExeName "WattPill.exe"
 
 [Setup]
-AppId={{7B1F2A9C-5C3E-4B7A-9D2E-6F1C8A4B0D31}
+AppId={{A769A478-DE92-460B-B131-B5424F1AD5F0}
 AppName={#MyAppName}
 AppVersion={#MyVersion}
 AppVerName={#MyAppName} {#MyVersion}
@@ -20,7 +20,7 @@ DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 LicenseFile=..\LICENSE
 OutputDir=..\dist
-OutputBaseFilename=JuiceBar-{#MyVersion}-setup
+OutputBaseFilename=WattPill-{#MyVersion}-setup
 SetupIconFile=..\res\app.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma2/max
@@ -32,7 +32,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 CloseApplications=yes
 RestartApplications=no
-AppMutex=Local\JuiceBarInstance
+AppMutex=Local\WattPillInstance
 MinVersion=10.0.18362
 
 [Languages]

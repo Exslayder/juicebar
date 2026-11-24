@@ -12,7 +12,7 @@ a one-off GitHub action. Nothing runs on the user's PC.
   `UI: RU | EN` badge.
 - `docs/social-preview.png` — upload it once in **Settings → Social preview**. GitHub will use it
   when the repository link is shared.
-- Winget manifest in `packaging/winget/JuiceBar/JuiceBar/1.0.5/`; `winget validate` passes.
+- Winget manifest in `packaging/winget/WattPill/WattPill/2.0.0/`; `winget validate` passes.
 
 ## Channels that need no new registration
 
@@ -21,14 +21,14 @@ a one-off GitHub action. Nothing runs on the user's PC.
 Winget is built into Windows 10/11. A package in `microsoft/winget-pkgs` means:
 
 ```powershell
-winget install JuiceBar.JuiceBar
+winget install WattPill.WattPill
 ```
 
 Submitting uses the existing GitHub account and no local resources:
 
 1. Fork `microsoft/winget-pkgs`.
-2. Copy `packaging/winget/JuiceBar/JuiceBar/1.0.5/` to
-   `manifests/j/JuiceBar/JuiceBar/1.0.5/`.
+2. Copy `packaging/winget/WattPill/WattPill/2.0.0/` to
+   `manifests/w/WattPill/WattPill/2.0.0/`.
 3. Run `winget validate <folder>` (already passes locally).
 4. Open a PR with the manifest.
 
@@ -40,7 +40,7 @@ These are curated GitHub lists; a PR uses the same account. Keep the entry short
 list's rules:
 
 - `awesome-windows` / `awesome-windows-apps` — under “Utilities” or “System”.
-  Proposed line: `- [JuiceBar](https://github.com/Exslayder/juicebar) — native Windows taskbar pill with battery level and remaining time for wireless mice, headsets and controllers.`
+  Proposed line: `- [WattPill](https://github.com/Exslayder/wattpill) — native Windows taskbar pill with battery level and remaining time for wireless mice, headsets and controllers.`
 - `awesome-battery` / similar hardware lists — only if the scope fits.
 - Check the contribution rules first; do not add to lists that ban self-promotion.
 
@@ -62,7 +62,7 @@ author, and do not post the same text in several communities on the same day.
 
 **Body:**
 > I wanted the battery level of my wireless mouse and headset on the taskbar without installing
-> Razer Synapse / SteelSeries GG / HyperX software. JuiceBar is a small native Win32 app: a pill
+> Razer Synapse / SteelSeries GG / HyperX software. WattPill is a small native Win32 app: a pill
 > above the clock shows the real percentage (or a 10 % step where the device only reports that) and
 > an estimated time left. Click it for a compact panel.
 >
@@ -72,24 +72,24 @@ author, and do not post the same text in several communities on the same day.
 > - Supports SteelSeries Aerox/Prime, Razer Barracuda X, HyperX Cloud/Stinger, Sony PULSE 3D,
 >   Xbox controllers and Bluetooth devices whose battery Windows exposes.
 >
-> Installer (per-user, unsigned): https://github.com/Exslayder/juicebar/releases/latest
-> Source and screenshots: https://github.com/Exslayder/juicebar
+> Installer (per-user, unsigned): https://github.com/Exslayder/wattpill/releases/latest
+> Source and screenshots: https://github.com/Exslayder/wattpill
 >
 > It is my project; happy to answer questions and add devices if you send a HID dump.
 
 ### Reddit — r/software (shorter)
 
-**Title:** JuiceBar — battery percentage and time left on the Windows taskbar
+**Title:** WattPill — battery percentage and time left on the Windows taskbar
 
 **Body:**
 > A small native Windows tool that shows the real battery level and an estimated remaining time for
 > wireless mice, headsets and controllers. No vendor software, no telemetry, no account; English and
-> Russian UI. Per-user installer: https://github.com/Exslayder/juicebar/releases/latest
+> Russian UI. Per-user installer: https://github.com/Exslayder/wattpill/releases/latest
 > (I am the author.)
 
 ### Hacker News — Show HN
 
-**Title:** Show HN: JuiceBar – native Windows taskbar battery monitor
+**Title:** Show HN: WattPill – native Windows taskbar battery monitor
 
 **Text:**
 > I built a small Win32/GDI+ app that puts a battery pill on the Windows taskbar. It talks to
@@ -97,17 +97,17 @@ author, and do not post the same text in several communities on the same day.
 > Bluetooth battery property and XInput, and fits a local discharge curve for “time left”. No
 > telemetry and no vendor software.
 >
-> Source and screenshots: https://github.com/Exslayder/juicebar
-> Installer: https://github.com/Exslayder/juicebar/releases/latest
+> Source and screenshots: https://github.com/Exslayder/wattpill
+> Installer: https://github.com/Exslayder/wattpill/releases/latest
 >
 > The interesting part for me was the protocol work and the borderless-fullscreen detection; happy
 > to discuss either.
 
 ### Telegram / X (short)
 
-> JuiceBar — уровень заряда и оставшееся время прямо на панели задач Windows. Мыши, наушники,
+> WattPill — уровень заряда и оставшееся время прямо на панели задач Windows. Мыши, наушники,
 > геймпады; без софта производителя, без телеметрии. Русский/English.
-> https://github.com/Exslayder/juicebar/releases/latest
+> https://github.com/Exslayder/wattpill/releases/latest
 
 ## Rules
 
@@ -123,8 +123,8 @@ author, and do not post the same text in several communities on the same day.
 GitHub release downloads and stars are visible without a website:
 
 ```powershell
-(Invoke-RestMethod -Headers @{ "User-Agent"="JuiceBar" } `
-  -Uri "https://api.github.com/repos/Exslayder/juicebar/releases").assets |
+(Invoke-RestMethod -Headers @{ "User-Agent"="WattPill" } `
+  -Uri "https://api.github.com/repos/Exslayder/wattpill/releases").assets |
   Select-Object name, download_count
 ```
 

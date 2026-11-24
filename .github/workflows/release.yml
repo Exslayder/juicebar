@@ -9,7 +9,7 @@ on:
       version:
         description: "Version to build (without the leading v)"
         required: true
-        default: "1.0.5"
+        default: "2.0.0"
 
 permissions:
   contents: write
@@ -35,7 +35,7 @@ jobs:
           if (-not $version) { $version = "${{ github.ref_name }}".TrimStart("v") }
           if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Unexpected version '$version'" }
           "value=$version" >> $env:GITHUB_OUTPUT
-          Write-Host "Building JuiceBar $version"
+          Write-Host "Building WattPill $version"
 
       - name: Fetch pinned MinGW-w64 toolchain
         shell: pwsh
@@ -52,7 +52,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: juicebar-${{ steps.version.outputs.value }}
+          name: wattpill-${{ steps.version.outputs.value }}
           path: dist/*
           if-no-files-found: error
 
@@ -60,8 +60,8 @@ jobs:
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: v${{ steps.version.outputs.value }}
-          name: JuiceBar ${{ steps.version.outputs.value }}
+          name: WattPill ${{ steps.version.outputs.value }}
           draft: true
           prerelease: false
           body_path: docs/RELEASE_NOTES.md
-          files: dist/JuiceBar-${{ steps.version.outputs.value }}-setup.exe
+          files: dist/WattPill-${{ steps.version.outputs.value }}-setup.exe

@@ -26,6 +26,22 @@ bool FileExists(const std::wstring& path) {
     return attr != INVALID_FILE_ATTRIBUTES && !(attr & FILE_ATTRIBUTE_DIRECTORY);
 }
 
+// Copy the JuiceBar settings/history once, when WattPill starts for the first time.
+void MigrateLegacy(const Paths& p) {
+    const std::wstring oldBase = Environment(L"APPDATA") + L"\\JuiceBar";
+    const std::wstring oldData = Environment(L"LOCALAPPDATA") + L"\\JuiceBar";
+    const std::wstring oldSettings = oldBase + L"\\settings.ini";
+    const std::wstring oldHistory = oldData + L"\\history.tsv";
+    if (!FileExists(p.settingsFile) && FileExists(oldSettings)) {
+        EnsureDirectory(p.baseDir);
+        CopyFileW(oldSettings.c_str(), p.settingsFile.c_str(), FALSE);
+    }
+    if (!FileExists(p.historyFile) && FileExists(oldHistory)) {
+        EnsureDirectory(p.dataDir);
+        CopyFileW(oldHistory.c_str(), p.historyFile.c_str(), FALSE);
+    }
+}
+
 std::string ReadAll(const std::wstring& file) {
     FILE* f = _wfopen(file.c_str(), L"rb");
     if (!f) return {};
@@ -78,13 +94,14 @@ Paths ResolvePaths(const std::wstring& overrideDir) {
     } else if (portable) {
         p.baseDir = p.dataDir = exeDir;
     } else {
-        p.baseDir = Environment(L"APPDATA") + L"\\JuiceBar";
-        p.dataDir = Environment(L"LOCALAPPDATA") + L"\\JuiceBar";
+        p.baseDir = Environment(L"APPDATA") + L"\\WattPill";
+        p.dataDir = Environment(L"LOCALAPPDATA") + L"\\WattPill";
     }
     EnsureDirectory(p.baseDir);
     EnsureDirectory(p.dataDir);
     p.settingsFile = p.baseDir + L"\\settings.ini";
     p.historyFile = p.dataDir + L"\\history.tsv";
+    if (overrideDir.empty() && !portable) MigrateLegacy(p);
     return p;
 }
 
@@ -124,7 +141,7 @@ Settings LoadSettings(const std::wstring& file) {
 
 bool SaveSettings(const std::wstring& file, const Settings& s) {
     std::string text;
-    text += "# JuiceBar settings\n";
+    text += "# WattPill settings\n";
     text += "[general]\n";
     text += "poll_seconds=" + std::to_string(std::clamp(s.pollSeconds, 15, 900)) + "\n";
     text += std::string("show_pill=") + (s.showPill ? "1" : "0") + "\n";

@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.10.0.schema.json
-PackageIdentifier: JuiceBar.JuiceBar
-PackageVersion: 1.0.5
+PackageIdentifier: WattPill.WattPill
+PackageVersion: 2.0.0
 MinimumOSVersion: 10.0.18362.0
 InstallerType: inno
 Scope: user
@@ -14,11 +14,11 @@ InstallerSwitches:
   Interactive: ""
   Log: /LOG="<LOGPATH>"
 UpgradeBehavior: install
-ProductCode: "{7B1F2A9C-5C3E-4B7A-9D2E-6F1C8A4B0D31}"
+ProductCode: "{A769A478-DE92-460B-B131-B5424F1AD5F0}"
 ReleaseDate: 2026-11-24
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/Exslayder/juicebar/releases/download/v1.0.5/JuiceBar-1.0.5-setup.exe
-    InstallerSha256: F0759E488BB932B7645F0BA00ACCC9EE337A048C30613297F8EC4ED70E74A4F0
+    InstallerUrl: https://github.com/Exslayder/wattpill/releases/download/v2.0.0/WattPill-2.0.0-setup.exe
+    InstallerSha256: BABA83B409FD013052DA0827B1ED0666994E77EE7AFFA85A4C1B0C8084CC86F4
 ManifestType: installer
 ManifestVersion: 1.10.0

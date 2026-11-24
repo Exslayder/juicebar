@@ -35,11 +35,11 @@ BEGIN
   BEGIN
     BLOCK "040904B0"
     BEGIN
-      VALUE "FileDescription", "JuiceBar"
-      VALUE "ProductName", "JuiceBar"
+      VALUE "FileDescription", "WattPill"
+      VALUE "ProductName", "WattPill"
       VALUE "FileVersion", JB_VERSION_STRING
       VALUE "ProductVersion", JB_VERSION_STRING
-      VALUE "OriginalFilename", "JuiceBar.exe"
+      VALUE "OriginalFilename", "WattPill.exe"
       VALUE "LegalCopyright", "MIT License"
     END
   END

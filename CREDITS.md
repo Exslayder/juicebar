@@ -1,6 +1,6 @@
 # Credits
 
-JuiceBar is MIT licensed. It uses the following assets and protocol research.
+WattPill is MIT licensed. It uses the following assets and protocol research.
 
 ## Fonts
 
@@ -19,7 +19,7 @@ JuiceBar is MIT licensed. It uses the following assets and protocol research.
 
 ## Runtime
 
-JuiceBar has no runtime dependencies: the exe is a single self-contained Win32 + GDI+ binary. It
+WattPill has no runtime dependencies: the exe is a single self-contained Win32 + GDI+ binary. It
 does not use WebView2, Electron or any embedded browser.
 
 ## Protocols

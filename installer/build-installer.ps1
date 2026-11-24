@@ -1,4 +1,4 @@
-# Builds the Windows installer for JuiceBar.
+# Builds the Windows installer for WattPill.
 # Requires Inno Setup 6+ (https://jrsoftware.org/isinfo.php). On CI Chocolatey installs it.
 param(
     [Parameter(Mandatory = $true)][string]$Version
@@ -7,9 +7,9 @@ param(
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $dist = Join-Path $root "dist"
-$exe = Join-Path $root "build\JuiceBar.exe"
+$exe = Join-Path $root "build\WattPill.exe"
 
-if (-not (Test-Path $exe)) { throw "Build the application first: build\JuiceBar.exe is missing." }
+if (-not (Test-Path $exe)) { throw "Build the application first: build\WattPill.exe is missing." }
 
 function Find-Iscc {
     if ($env:ISCC -and (Test-Path $env:ISCC)) { return $env:ISCC }
@@ -41,10 +41,10 @@ if (-not $iscc) {
 }
 
 New-Item -ItemType Directory -Force $dist | Out-Null
-Remove-Item (Join-Path $dist "JuiceBar-$Version-setup.exe") -Force -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $dist "WattPill-$Version-setup.exe") -Force -ErrorAction SilentlyContinue
 
 Write-Host "Building installer with $iscc ..."
-& $iscc "/DMyVersion=$Version" (Join-Path $PSScriptRoot "juicebar.iss")
+& $iscc "/DMyVersion=$Version" (Join-Path $PSScriptRoot "wattpill.iss")
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
 
 Get-ChildItem $dist | Select-Object Name, Length | Format-Table -AutoSize

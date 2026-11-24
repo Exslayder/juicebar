@@ -1,4 +1,4 @@
-// JuiceBar: battery level and remaining time for wireless mice, headsets and controllers.
+// WattPill: battery level and remaining time for wireless mice, headsets and controllers.
 #include "config.h"
 #include "core.h"
 #include "drivers.h"
@@ -24,12 +24,12 @@
 namespace ch {
 namespace {
 
-const wchar_t* kAppName = L"JuiceBar";
+const wchar_t* kAppName = L"WattPill";
 const wchar_t* kVersion = JB_VERSION_WIDE;
-const wchar_t* kWindowClass = L"JuiceBarMsg";
+const wchar_t* kWindowClass = L"WattPillMsg";
 const wchar_t* kRunKey = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-const wchar_t* kRunValue = L"JuiceBar";
-const wchar_t* kMutexName = L"Local\\JuiceBarInstance";
+const wchar_t* kRunValue = L"WattPill";
+const wchar_t* kMutexName = L"Local\\WattPillInstance";
 
 constexpr UINT WM_APP_POLL = WM_APP + 1;
 constexpr UINT WM_APP_SHOW = WM_APP + 2;
@@ -133,11 +133,20 @@ void EnsureAutostart(bool on) {
     RegCloseKey(key);
 }
 
+// The old JuiceBar autostart value would start the previous app alongside WattPill.
+void RemoveLegacyAutostart() {
+    HKEY key = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, kRunKey, 0, KEY_SET_VALUE, &key) == ERROR_SUCCESS) {
+        RegDeleteValueW(key, L"JuiceBar");
+        RegCloseKey(key);
+    }
+}
+
 // ---------------------------------------------------------------- menu
 
 void ShowMenu(HWND owner) {
     HMENU menu = CreatePopupMenu();
-    AppendMenuW(menu, MF_STRING | MF_DISABLED, 0, L"JuiceBar");
+    AppendMenuW(menu, MF_STRING | MF_DISABLED, 0, L"WattPill");
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, ID_REFRESH, T(L"Обновить", L"Refresh"));
     AppendMenuW(menu, MF_STRING | (app.settings.autoStart ? MF_CHECKED : MF_UNCHECKED), ID_AUTOSTART,
@@ -475,6 +484,7 @@ int Run(int argc, wchar_t** argv) {
     app.settings = LoadSettings(app.paths.settingsFile);
     SetUiLanguage(app.settings.language);
     app.savedShowPill = app.settings.showPill;
+    if (options.dataDir.empty()) RemoveLegacyAutostart();
     EnsureAutostart(app.settings.autoStart);
     if (options.noPill) app.settings.showPill = false;
     app.pollSeconds = app.settings.pollSeconds;
@@ -548,7 +558,7 @@ int Run(int argc, wchar_t** argv) {
 LONG WINAPI CrashFilter(EXCEPTION_POINTERS* info) {
     wchar_t dir[MAX_PATH] = {};
     if (!GetEnvironmentVariableW(L"LOCALAPPDATA", dir, MAX_PATH)) return EXCEPTION_EXECUTE_HANDLER;
-    std::wstring folder = std::wstring(dir) + L"\\JuiceBar";
+    std::wstring folder = std::wstring(dir) + L"\\WattPill";
     CreateDirectoryW(folder.c_str(), nullptr);
     const std::wstring dump = folder + L"\\crash.dmp";
     HANDLE file = CreateFileW(dump.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);

@@ -1,7 +1,7 @@
-# JuiceBar
+# WattPill
 
-[![release](https://img.shields.io/github/v/release/Exslayder/juicebar.svg?label=release)](https://github.com/Exslayder/juicebar/releases/latest)
-[![build](https://github.com/Exslayder/juicebar/actions/workflows/release.yml/badge.svg)](https://github.com/Exslayder/juicebar/actions/workflows/release.yml)
+[![release](https://img.shields.io/github/v/release/Exslayder/wattpill.svg?label=release)](https://github.com/Exslayder/wattpill/releases/latest)
+[![build](https://github.com/Exslayder/wattpill/actions/workflows/release.yml/badge.svg)](https://github.com/Exslayder/wattpill/actions/workflows/release.yml)
 [![UI](docs/ui-badge.svg)](#languages)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D4)](#requirements)
@@ -10,16 +10,19 @@
 Battery level **and remaining time** for wireless mice, headsets and controllers — right on the
 Windows taskbar, without vendor software.
 
-![JuiceBar panel and pill in English](docs/screenshot.png)
+![WattPill panel and pill in English](docs/screenshot.png)
 
 A small pill floats above the clock (or sits on the taskbar, if you prefer) and shows the real level
 reported by each device. Click it and a compact panel opens with the device name, the estimated time
 left, the percentage and a battery glyph. It closes 200 ms after the pointer leaves it (or on a
 second click on the pill).
 
+> **Renamed from JuiceBar.** WattPill is the new name. Settings and history from JuiceBar 1.x are
+> migrated on first launch; if you have JuiceBar installed, uninstall it after installing WattPill.
+
 ## Why another battery monitor
 
-Most tools only repeat a percentage. JuiceBar answers the question you actually have: *"how long
+Most tools only repeat a percentage. WattPill answers the question you actually have: *"how long
 until it dies?"* — and it is honest about it: a forecast is shown as a forecast, never as a
 measurement, and it is labelled while the data is still thin.
 
@@ -43,17 +46,17 @@ measurement, and it is labelled while the data is still thin.
 
 ## Install
 
-Download `JuiceBar-1.0.5-setup.exe` from the latest release and run it. The installer is per-user — no
+Download `WattPill-2.0.0-setup.exe` from the latest release and run it. The installer is per-user — no
 administrator rights, no UAC prompt. By default it installs into
-`%LOCALAPPDATA%\Programs\JuiceBar` and adds a Start menu shortcut; the wizard also lets you pick
-another folder (for example `D:\Apps\JuiceBar`).
+`%LOCALAPPDATA%\Programs\WattPill` and adds a Start menu shortcut; the wizard also lets you pick
+another folder (for example `D:\Apps\WattPill`).
 
 Release binaries are built by GitHub Actions from the tagged commit; the workflow runs the unit
 tests, then produces the installer.
 
-To remove the app, use *Settings → Apps → Installed apps → JuiceBar* (or *Apps & features* on
+To remove the app, use *Settings → Apps → Installed apps → WattPill* (or *Apps & features* on
 Windows 10) or the uninstaller in the install folder. Your settings and history are kept; delete
-`%APPDATA%\JuiceBar` and `%LOCALAPPDATA%\JuiceBar` to remove them too.
+`%APPDATA%\WattPill` and `%LOCALAPPDATA%\WattPill` to remove them too.
 
 ## Placement
 
@@ -75,7 +78,7 @@ left of the tray; *Above the clock* brings it back. Both are shown below.
 | Xbox controllers (XInput) | wireless | coarse level (empty / low / medium / full → 5 / 20 / 60 / 100 %) |
 | Bluetooth devices with a Windows battery level | Bluetooth LE / classic | the level Windows itself exposes (headsets, earbuds, mice, keyboards) |
 
-Everything else is ignored: JuiceBar only queries the devices it recognises and never changes their
+Everything else is ignored: WattPill only queries the devices it recognises and never changes their
 settings. Speakers that do not publish a battery level (most JBL, for example) cannot be shown —
 Windows has no number to read.
 
@@ -135,15 +138,15 @@ panel.
 ## Command line
 
 ```
-JuiceBar.exe --once          print detected devices and exit
-JuiceBar.exe --json          same as JSON
-JuiceBar.exe --dump          list HID collections (for adding new devices)
-JuiceBar.exe --fonts         report which UI fonts were resolved
-JuiceBar.exe --fullscreen    report the fullscreen detection and exit
-JuiceBar.exe --panel         start with the panel open
-JuiceBar.exe --no-pill       hide the taskbar pill for this run
-JuiceBar.exe --data <dir>    keep settings and history in <dir> (portable)
-JuiceBar.exe --quit          close the running instance
+WattPill.exe --once          print detected devices and exit
+WattPill.exe --json          same as JSON
+WattPill.exe --dump          list HID collections (for adding new devices)
+WattPill.exe --fonts         report which UI fonts were resolved
+WattPill.exe --fullscreen    report the fullscreen detection and exit
+WattPill.exe --panel         start with the panel open
+WattPill.exe --no-pill       hide the taskbar pill for this run
+WattPill.exe --data <dir>    keep settings and history in <dir> (portable)
+WattPill.exe --quit          close the running instance
 ```
 
 ## Requirements
@@ -159,12 +162,12 @@ project (no system installation):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\toolchain.ps1
-powershell -ExecutionPolicy Bypass -File build.ps1 -Version 1.0.5
+powershell -ExecutionPolicy Bypass -File build.ps1 -Version 2.0.0
 powershell -ExecutionPolicy Bypass -File test.ps1
 ```
 
 `build.ps1` compiles the native sources in `src\`, embeds the icons and the three Inter faces, and
-writes a single self-contained `build\JuiceBar.exe`.
+writes a single self-contained `build\WattPill.exe`.
 
 The build is reproducible: the linker does not insert a PE timestamp, so two builds of the same
 commit with the same toolchain are byte-identical (SHA-256), and anyone can verify a release
@@ -174,16 +177,16 @@ MinGW archive before extracting it.
 To build the installer you need [Inno Setup 6+](https://jrsoftware.org/isinfo.php):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1 -Version 1.0.5
+powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1 -Version 2.0.0
 ```
 
-The result is `dist\JuiceBar-<version>-setup.exe`.
+The result is `dist\WattPill-<version>-setup.exe`.
 
 ## Data & privacy
 
-- Settings: `%APPDATA%\JuiceBar\settings.ini`
-- History: `%LOCALAPPDATA%\JuiceBar\history.tsv` (30 days, sampled once a minute)
-- Autostart: `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\JuiceBar`
+- Settings: `%APPDATA%\WattPill\settings.ini`
+- History: `%LOCALAPPDATA%\WattPill\history.tsv` (30 days, sampled once a minute)
+- Autostart: `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\WattPill`
 - Nothing is sent anywhere: there is no HTTP client in the binary.
 - `--data <dir>` or a `portable.flag` file next to the exe keeps everything in one folder.
 

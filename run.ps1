@@ -6,11 +6,11 @@ param(
 )
 
 $root = $PSScriptRoot
-$exe = Join-Path $root "build\JuiceBar.exe"
+$exe = Join-Path $root "build\WattPill.exe"
 if (-not (Test-Path $exe)) { & (Join-Path $root "build.ps1") }
 
 if (-not $Stay) {
-    Get-Process JuiceBar -ErrorAction SilentlyContinue | Stop-Process -Force
+    Get-Process WattPill -ErrorAction SilentlyContinue | Stop-Process -Force
     Start-Sleep -Milliseconds 400
 }
 if (-not $Data) { $Data = Join-Path $root ".devdata" }
@@ -19,4 +19,4 @@ New-Item -ItemType Directory -Force $Data | Out-Null
 $arguments = @("--data", "`"$Data`"")
 if ($Panel) { $arguments += "--panel" }
 Start-Process -FilePath $exe -ArgumentList $arguments
-Write-Host "JuiceBar started with data in $Data"
+Write-Host "WattPill started with data in $Data"
