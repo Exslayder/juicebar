@@ -19,6 +19,6 @@ ReleaseDate: 2026-11-24
 Installers:
   - Architecture: x64
     InstallerUrl: https://github.com/Exslayder/wattpill/releases/download/v2.0.0/WattPill-2.0.0-setup.exe
-    InstallerSha256: BABA83B409FD013052DA0827B1ED0666994E77EE7AFFA85A4C1B0C8084CC86F4
+    InstallerSha256: 0822ECE22DA9E00F33E3A0EF323D2CED5F1E8AB5B2ABFF97C8B6A8CB179424BA
 ManifestType: installer
 ManifestVersion: 1.10.0
