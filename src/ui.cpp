@@ -24,7 +24,6 @@ namespace {
 
 constexpr UINT WM_APP_REFRESH_UI = WM_APP + 40;
 
-constexpr int kPillTimerHover = 1;
 constexpr int kPanelTimerHide = 2;
 constexpr int kPanelTimerAnim = 3;
 
@@ -889,21 +888,14 @@ LRESULT CALLBACK PillProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 g.pillHover = true;
                 TrackLeave(h);
                 RenderPill();
-                        }
+            }
             return 0;
         case WM_MOUSELEAVE:
             g.pillHover = false;
-            KillTimer(h, kPillTimerHover);
             RenderPill();
             // Leaving the pill also counts as "away": the panel closes shortly unless the cursor
             // lands on it (then the panel's own WM_MOUSEMOVE cancels the timer).
             if (g.visible && g.panel) SetTimer(g.panel, kPanelTimerHide, 200, nullptr);
-            return 0;
-        case WM_TIMER:
-            if (wp == kPillTimerHover) {
-                KillTimer(h, kPillTimerHover);
-                if (g.pillHover && !g.visible) ShowPanelInternal();
-            }
             return 0;
         case WM_LBUTTONUP: {
             // Debounce: a burst of clicks is one gesture, not a flicker of open/close animations.

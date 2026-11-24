@@ -9,7 +9,7 @@
 Battery level **and remaining time** for wireless mice, headsets and controllers — right on the
 Windows taskbar, without vendor software.
 
-![JuiceBar panel](docs/screenshot.png)
+![JuiceBar panel in English](docs/screenshot.png)
 
 A small pill floats above the clock (or sits on the taskbar, if you prefer) and shows the real level
 reported by each device. Click it and a compact panel opens with the device name, the estimated time
@@ -35,7 +35,10 @@ measurement, and it is labelled while the data is still thin.
 - **Starts with Windows.** Enabled on the first run; a checkbox in the right-click menu turns it
   off again (a single `HKCU\…\Run` value, no service, no admin rights).
 - **Follows Windows.** Light/dark theme comes from the taskbar and updates live; 100–200 % DPI
-  aware; Русский / English UI, switchable from the menu.
+  aware.
+- **English and Russian UI.** A Russian Windows starts in Russian, everything else in English;
+  right-click → Language switches and saves the choice. Menus, panel labels and duration strings
+  are translated.
 
 ## Install
 
@@ -47,9 +50,9 @@ another folder (for example `D:\Apps\JuiceBar`).
 Release binaries are built by GitHub Actions from the tagged commit; the workflow runs the unit
 tests, then produces the installer.
 
-To remove the app, use *Settings → Apps → Installed apps → JuiceBar* or the uninstaller in the
-install folder. Your settings and history are kept; delete `%APPDATA%\JuiceBar` and
-`%LOCALAPPDATA%\JuiceBar` to remove them too.
+To remove the app, use *Settings → Apps → Installed apps → JuiceBar* (or *Apps & features* on
+Windows 10) or the uninstaller in the install folder. Your settings and history are kept; delete
+`%APPDATA%\JuiceBar` and `%LOCALAPPDATA%\JuiceBar` to remove them too.
 
 ## Supported devices
 
@@ -64,9 +67,9 @@ install folder. Your settings and history are kept; delete `%APPDATA%\JuiceBar` 
 | Xbox controllers (XInput) | wireless | coarse level (empty / low / medium / full → 5 / 20 / 60 / 100 %) |
 | Bluetooth devices with a Windows battery level | Bluetooth LE / classic | the level Windows itself exposes (headsets, earbuds, mice, keyboards) |
 
-Everything else is ignored: JuiceBar only sends read-only queries to devices it recognises.
-Speakers that do not publish a battery level (most JBL, for example) cannot be shown — Windows has
-no number to read.
+Everything else is ignored: JuiceBar only queries the devices it recognises and never changes their
+settings. Speakers that do not publish a battery level (most JBL, for example) cannot be shown —
+Windows has no number to read.
 
 ## Accuracy
 
@@ -89,10 +92,10 @@ sessions break the window).
 
 | State | Panel text |
 |---|---|
-| less than 15 min of data | `Калибровка · ещё N мин` |
-| steady level | `Расход стабилен` |
-| forecast | `≈ 3 ч 20 мин` |
-| charging | `Заряжается · до полного 1 ч 05 мин` when the charge rate is known |
+| less than 15 min of data | `Calibrating · 12 min` |
+| steady level | `Drain is steady` |
+| forecast | `≈ 3 h 20 min` |
+| charging | `Charging · 1 h 05 min` when the charge rate is known |
 
 ## Polling
 
