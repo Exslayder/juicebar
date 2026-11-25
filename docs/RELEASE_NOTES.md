@@ -1,13 +1,15 @@
-# WattPill 2.1.1
+# WattPill 2.1.2
 
 Battery level **and remaining time** for wireless mice, headsets and controllers — right on the
 Windows taskbar, without vendor software.
 
-## Fixed in 2.1.1
+## Fixed in 2.1.2
 
-- The pill no longer comes back a few seconds after hiding in a fullscreen game when the Alt+Tab or
-  Task View shell overlay briefly takes the foreground. The fullscreen guard stays hidden through
-  shell overlays, and device updates can no longer force the pill visible.
+- The pill no longer jumps above the clock after repeated **Win + left-click** cycles over a
+  fullscreen game. When the taskbar is briefly not enumerable, the pill now keeps its last taskbar
+  position instead of using the "monitor without a taskbar" fallback.
+- Included from 2.1.1: the pill stays hidden through Alt+Tab / Task View shell overlays, while the
+  Win/Start menu correctly brings it back; device updates cannot force it visible during fullscreen.
 
 ![WattPill device panel and settings](https://raw.githubusercontent.com/Exslayder/wattpill/main/docs/screenshot.png)
 
@@ -38,7 +40,7 @@ Windows taskbar, without vendor software.
 
 ## Install
 
-Download `WattPill-2.1.1-setup.exe` and run it. Per-user installer: no administrator rights, no UAC
+Download `WattPill-2.1.2-setup.exe` and run it. Per-user installer: no administrator rights, no UAC
 prompt. By default it installs into `%LOCALAPPDATA%\Programs\WattPill` (the wizard lets you choose
 another folder), adds a Start menu shortcut and registers an uninstaller.
 
@@ -57,5 +59,5 @@ Windows 10 1903+ or Windows 11, x64. No runtime to install.
   the pill becomes clickable again as soon as the menu closes.
 - Settings: `%APPDATA%\WattPill\settings.ini`; history: `%LOCALAPPDATA%\WattPill\history.tsv`.
   Uninstalling keeps them; delete the folders to remove everything.
-- The Winget package `WattPill.WattPill` is being updated to 2.1.1; the GitHub installer above is
+- The Winget package `WattPill.WattPill` is being updated to 2.1.2; the GitHub installer above is
   the primary download.

@@ -1,8 +1,8 @@
 ; WattPill installer (Inno Setup 6+).
-; Build with installer\build-installer.ps1 -Version 2.1.1
+; Build with installer\build-installer.ps1 -Version 2.1.2
 
 #ifndef MyVersion
-  #define MyVersion "2.1.1"
+  #define MyVersion "2.1.2"
 #endif
 
 #define MyAppName "WattPill"

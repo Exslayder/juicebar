@@ -6,6 +6,16 @@ All notable changes to WattPill are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.1.2] — 2026-11-25
+
+### Fixed
+
+- Repeated **Win + left-click** cycles over a fullscreen game no longer move the pill above the
+  clock. When the taskbar is briefly not enumerable, the pill keeps its last taskbar position
+  instead of using the no-taskbar fallback.
+- 2.1.1 fixes are included: Alt+Tab / Task View overlays keep the pill hidden, while Win/Start
+  shows it again.
+
 ## [2.1.1] — 2026-11-25
 
 ### Fixed
