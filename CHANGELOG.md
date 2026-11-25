@@ -18,9 +18,11 @@ All notable changes to WattPill are documented here. The format follows
   percent only, plus an optional Fluent background plate.
 - While charging, the pill bolt and percentage are green.
 - *Hide in fullscreen* option.
-- *Monitor* selector: move the pill and panel to the primary or a secondary display.
-- Panel header with a single settings gear; the gear opens the same menu as right-click. *Open
-  panel* is also in the tray menu.
+- *Monitor* selector: *Основной* / *Дополнительный* (with an index when several), moving the pill
+  and panel to that display.
+- Settings open from the pill's right-click menu; the panel is pure content, without a wordmark,
+  device count or gear.
+- Dark/light native menu following the Windows app theme.
 - Panel slide-and-fade animation.
 - DirectWrite rendering for the pill text (the same grayscale rasterizer as WPF), with the GDI+ path
   as a fallback.
@@ -31,7 +33,7 @@ All notable changes to WattPill are documented here. The format follows
   radius 5, inset taskbar placement, Fluent glyphs, 16×9.5 battery capsule with nub and charging
   bolt, 12 px semibold percentages and the Windows 11 taskbar palette.
 - The panel keeps WattPill's own visual language (Inter, neutral cards, violet accent, Fluent
-  battery marks) and a corner gear, without the wordmark and device count.
+  battery marks) with no chrome.
 - Devices that stop answering are removed instead of being shown as disconnected.
 - Forecasts are more stable: Theil–Sen slope instead of least squares, a 10-minute observation
   window, no "calibration countdown", rounded remaining time and a `via · …` status prefix.

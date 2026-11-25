@@ -39,12 +39,12 @@ measurement, and it is labelled while the data is still thin.
   docks it left of the tray; *Above the clock* floats it over the clock. Shift-drag (or
   right-click → *Move widget*) slides it anywhere along the bar; *Reset position* puts it back.
 - **A panel that behaves like a shell flyout.** It opens centered on the pill with a short slide and
-  fade, keeps WattPill's own look (Inter, grouped cards, violet forecast accent), and has a compact
-  settings gear in the corner. The same settings open on right-click.
+  fade, keeps WattPill's own look (Inter, grouped cards, violet forecast accent) and contains no
+  chrome; settings live on the pill's right-click menu.
 - **A pill that matches the taskbar.** Detailed (glyph, mini battery capsule, percentage), compact
   (glyph and percentage) or percent-only; optional Fluent background plate. While charging, the bolt
-  and the percentage turn green. The gear turns and brightens under the pointer.
-- **Any monitor.** *Monitor* in the menu moves the pill and panel to the primary or a secondary
+  and the percentage turn green.
+- **Any monitor.** *Monitor* in the menu moves the pill and panel to the primary or an additional
   display, using that display's own taskbar.
 - **Starts with Windows.** Enabled on the first run; a checkbox in the right-click menu turns it
   off again (a single `HKCU\…\Run` value, no service, no admin rights).

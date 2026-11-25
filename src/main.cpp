@@ -11,6 +11,7 @@
 #include <gdiplus.h>
 #include <shellapi.h>
 #include <dbghelp.h>
+#include <uxtheme.h>
 
 #include <algorithm>
 #include <atomic>
@@ -220,11 +221,19 @@ void ShowMenu(HWND owner) {
     if (monitorList.empty()) {
         AppendMenuW(monitors, MF_STRING | MF_DISABLED, 0, T(L"Мониторы не найдены", L"No monitors"));
     } else {
+        const int nonPrimary = (int)monitorList.size() -
+                               (monitorList[0].primary ? 1 : 0);
+        int extra = 0;
         for (size_t i = 0; i < monitorList.size() && i < 16; i++) {
             const MonitorLite& m = monitorList[i];
-            const int w = m.rect.right - m.rect.left, h = m.rect.bottom - m.rect.top;
-            std::wstring label = Fmt(L"%d · %d×%d", (int)i + 1, w, h);
-            if (m.primary) label += T(L" (основной)", L" (primary)");
+            std::wstring label;
+            if (m.primary) {
+                label = T(L"Основной", L"Primary");
+            } else {
+                ++extra;
+                label = T(L"Дополнительный", L"Additional");
+                if (nonPrimary > 1) label += Fmt(L" %d", extra);
+            }
             AppendMenuW(monitors, MF_STRING | (app.settings.monitorIndex == (int)i ? MF_CHECKED : 0),
                         ID_MONITOR_FIRST + (UINT)i, label.c_str());
         }
@@ -412,6 +421,30 @@ DWORD WINAPI PollThread(LPVOID) {
 
 // ---------------------------------------------------------------- window
 
+// Native menus are always light unless the process opts into the undocumented uxtheme dark mode.
+// The ordinals are stable from Windows 10 1809 through Windows 11; when they are missing the menu
+// simply stays in the system light style.
+void ApplyMenuTheme() {
+    static HMODULE uxtheme = LoadLibraryW(L"uxtheme.dll");
+    if (!uxtheme) return;
+    using SetPreferredAppModeFn = int(WINAPI*)(int);
+    using AllowDarkModeForWindowFn = BOOL(WINAPI*)(HWND, BOOL);
+    using FlushMenuThemesFn = void(WINAPI*)();
+    static auto setPreferredAppMode =
+        (SetPreferredAppModeFn)GetProcAddress(uxtheme, MAKEINTRESOURCEA(135));
+    static auto allowDarkModeForWindow =
+        (AllowDarkModeForWindowFn)GetProcAddress(uxtheme, MAKEINTRESOURCEA(133));
+    static auto flushMenuThemes = (FlushMenuThemesFn)GetProcAddress(uxtheme, MAKEINTRESOURCEA(136));
+
+    const bool dark = !AppIsLight();
+    if (setPreferredAppMode) setPreferredAppMode(dark ? 2 : 3);   // ForceDark / ForceLight
+    if (app.hwnd) {
+        if (allowDarkModeForWindow) allowDarkModeForWindow(app.hwnd, dark ? TRUE : FALSE);
+        SetWindowTheme(app.hwnd, dark ? L"DarkMode_Explorer" : L"Explorer", nullptr);
+    }
+    if (flushMenuThemes) flushMenuThemes();
+}
+
 LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
         case WM_APP_POLL: {
@@ -439,6 +472,7 @@ LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             SetEvent(app.wakeEvent);   // a device was plugged in or paired: poll right away
             return 0;
         case WM_SETTINGCHANGE:
+            ApplyMenuTheme();
             ui::OnSystemSettingsChanged();
             return 0;
         case WM_POWERBROADCAST:
@@ -635,6 +669,7 @@ int Run(int argc, wchar_t** argv) {
 
     app.hwnd = CreateWindowExW(0, kWindowClass, kAppName, WS_OVERLAPPED, 0, 0, 0, 0, nullptr, nullptr, app.inst, nullptr);
     if (!app.hwnd) return 1;
+    ApplyMenuTheme();
 
     app.wakeEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
     app.stopEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);

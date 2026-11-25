@@ -32,8 +32,8 @@ surface ladder (`#202020` panel, `#2B2B2B` cards), Inter for all text, 16 px car
 violet forecast accent. It opens from the pill or the gear, centered on the widget, with a short
 slide and fade.
 
-- A compact header holds only the settings gear. The gear brightens and turns 60° under the
-  pointer, then opens the settings menu.
+- The panel is pure content: no header, no close button, no gear. Settings open from the pill's
+  right-click menu, so the flyout stays quiet.
 - Each device is an 80 DIP row: a 22 px device glyph, the name in 14.5 px semibold, the status or
   forecast in 13.5 px (prefixed with the connection, e.g. `2.4 GHz · ≈ 4 ч`), the percentage in
   19 px semibold and a Fluent battery mark that morphs between levels.
@@ -61,31 +61,29 @@ DPI from 100 % to 200 % is handled by scaling every metric from the system DPI.
 
 - The panel fades in over about 120 ms while sliding 10 DIP toward its anchored position, like the
   shell's own flyouts.
-- The gear eases from grey to white and rotates 60° on hover.
 - The charging battery breathes (a 33 ms timer that runs only while the panel is visible and only
   when something is actually charging).
 - While the panel is closed and nothing changes, the app does **zero** drawing work.
 
 ## Settings
 
-The gear and the right-click menu open the same native menu:
+The right-click menu on the pill is the only settings surface:
 
 - Refresh, Open panel
 - Placement: above the clock, on the taskbar, Move widget, Reset position
 - Pill style: detailed, compact, percent only; pill background
 - Hide in fullscreen
-- Monitor: primary or any connected display
+- Monitor: *Основной* and *Дополнительный* (adds a number when there are several)
 - Start with Windows
 - Language: Auto, Russian, English
 - Exit
 
-The menu is a standard Win32 popup, so it follows the system theme, keyboard navigation and DPI.
+The menu is a standard Win32 popup themed dark or light with the Windows app theme.
 
 ## Layout
 
 ```
 ┌────────────────────────────────────────────┐
-│                                       ⚙    │
 │  ┌──────────────────────────────────────┐  │
 │  │  (icon)  Razer Barracuda X 2.4  48%  │  │
 │  │          2.4 GHz · Расход стабилен   │  │

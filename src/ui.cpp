@@ -66,7 +66,7 @@ struct Fonts {
     std::unique_ptr<FontFamily> iconFamily;
     std::unique_ptr<FontFamily> pillFamily;
     std::unique_ptr<Font> name, small, status, percent;
-    std::unique_ptr<Font> pillPct, pillGlyph, pillBolt, gearGlyph;
+    std::unique_ptr<Font> pillPct, pillGlyph, pillBolt;
 
     void Build(float scale, bool hasUi, FontFamily* regular, FontFamily* medium, FontFamily* semibold) {
         if (!regular) {
@@ -97,7 +97,6 @@ struct Fonts {
         pillPct = std::make_unique<Font>(pillFamily.get(), 12.0f * scale, FontStyleRegular, UnitPixel);
         pillGlyph = std::make_unique<Font>(iconFamily.get(), 13.5f * scale, FontStyleRegular, UnitPixel);
         pillBolt = std::make_unique<Font>(iconFamily.get(), 9.5f * scale, FontStyleRegular, UnitPixel);
-        gearGlyph = std::make_unique<Font>(iconFamily.get(), 16.5f * scale, FontStyleRegular, UnitPixel);
     }
 };
 
@@ -184,10 +183,6 @@ struct State {
     bool visible = false;
 
     int hoveredCard = -1;
-    bool gearHover = false;
-    float gearHoverT = 0;
-    float gearAngle = 0;
-    RectF settingsRect{};
 
     float scale = 1.0f;
     Theme theme;
@@ -738,11 +733,10 @@ void RenderPill() {
 
 int MeasurePanelHeight(int count) {
     const int pad = (int)std::lround(16 * g.scale);
-    const int header = (int)std::lround(36 * g.scale);
     const int cardH = (int)std::lround(80 * g.scale);
     const int gap = (int)std::lround(10 * g.scale);
     const int body = count > 0 ? count * cardH + (count - 1) * gap : (int)std::lround(84 * g.scale);
-    return pad + header + body + pad;
+    return pad + body + pad;
 }
 
 float TargetPercent(const Card& card) {
@@ -824,26 +818,9 @@ void RenderPanel() {
     FillRound(g2, RectF(0, 0, (float)width, (float)height), (float)radius, g.theme.bg);
     StrokeRound(g2, RectF(0.5f, 0.5f, width - 1.0f, height - 1.0f), (float)radius, g.theme.border, 1.0f);
 
-    // ---- header: just the settings gear, so the cards start close to the top
-    const int header = (int)std::lround(36 * g.scale);
-    g.settingsRect = RectF((float)(width - pad) - 32 * g.scale, 6 * g.scale, 32 * g.scale, 32 * g.scale);
-    if (g.gearHoverT > 0.01f)
-        FillRound(g2, g.settingsRect, 8 * g.scale, WithAlpha(g.theme.text, (BYTE)std::lround(16 * g.gearHoverT)));
-    {
-        const float cx = g.settingsRect.X + g.settingsRect.Width / 2;
-        const float cy = g.settingsRect.Y + g.settingsRect.Height / 2;
-        GraphicsState state = g2.Save();
-        g2.TranslateTransform(cx, cy);
-        g2.RotateTransform(g.gearAngle);
-        g2.TranslateTransform(-cx, -cy);
-        Text(g2, L"\uE713", g.fonts.gearGlyph.get(), g.settingsRect,
-             g.gearHoverT > 0.01f ? g.theme.text : WithAlpha(g.theme.text, 200), StringAlignmentCenter);
-        g2.Restore(state);
-    }
-
     // ---- cards
     g.cardRects.clear();
-    float y = (float)(pad + header);
+    float y = (float)pad;
     if (count == 0) {
         RectF box((float)pad, y, (float)(width - pad * 2), 84 * g.scale);
         FillRound(g2, box, 16 * g.scale, g.theme.card);
@@ -1179,16 +1156,6 @@ void Animate() {
         if (g.spin >= 360.0f) g.spin -= 360.0f;
     }
 
-    // The gear eases from grey to white and turns 60 degrees under the pointer.
-    const float gearTarget = g.gearHover ? 1.0f : 0.0f;
-    if (std::fabs(gearTarget - g.gearHoverT) > 0.004f) {
-        g.gearHoverT += (gearTarget - g.gearHoverT) * std::min(1.0f, dt * 14.0f);
-        active = true;
-    } else {
-        g.gearHoverT = gearTarget;
-    }
-    g.gearAngle = g.gearHoverT * 60.0f;
-
     if (g.reveal < 1.0f) {
         g.reveal = std::min(1.0f, g.reveal + dt * 8.0f);
         active = true;
@@ -1320,19 +1287,14 @@ LRESULT CALLBACK PanelProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                     break;
                 }
             }
-            int button = g.settingsRect.Contains((float)p.x, (float)p.y) ? 1 : 0;
-            if (cardIndex != g.hoveredCard || (button == 1) != g.gearHover) {
+            if (cardIndex != g.hoveredCard) {
                 g.hoveredCard = cardIndex;
-                g.gearHover = button == 1;
-                SetTimer(h, kPanelTimerAnim, 33, nullptr);
                 RenderPanel();
             }
             return 0;
         }
         case WM_MOUSELEAVE:
             g.hoveredCard = -1;
-            g.gearHover = false;
-            SetTimer(h, kPanelTimerAnim, 33, nullptr);
             SetTimer(h, kPanelTimerHide, 200, nullptr);
             RenderPanel();
             return 0;
@@ -1350,12 +1312,6 @@ LRESULT CALLBACK PanelProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             }
             return 0;
         case WM_LBUTTONUP:
-            if (g.gearHover) {
-                if (g.hooks.menu) g.hooks.menu();
-            }
-            return 0;
-        case WM_RBUTTONUP:
-            if (g.hooks.menu) g.hooks.menu();
             return 0;
         case WM_APP_REFRESH_UI:
         case WM_DISPLAYCHANGE:
