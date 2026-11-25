@@ -48,6 +48,11 @@ does not use WebView2, Electron or any embedded browser.
 
 ## Inspiration
 
+- **PowerVision / PowerUSB** by neverifelse (https://github.com/neverifelse/powerusb, MIT) — the
+  design and UX reference for the taskbar widget: inset pill geometry, the topmost-window anchoring
+  model, the flyout layout and the move/reset affordances. WattPill re-implements these ideas
+  natively in Win32 + GDI+; no C#/WPF code or assets were copied, and WattPill keeps its own
+  drivers and settings.
 - **BatteryHub** (`krisgfx9/Wireless-Device-Battery-Monitor`, GPL-3.0) for the feature comparison and
   the confirmation that per-device percentages are readable on the taskbar. No code was copied;
   protocols were implemented from the sources above and verified against real hardware.

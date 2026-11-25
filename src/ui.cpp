@@ -28,6 +28,7 @@ constexpr int kPanelTimerHide = 2;
 constexpr int kPanelTimerAnim = 3;
 
 struct Theme {
+    // Flyout: WattPill's own neutral surface ladder with the violet forecast accent.
     Color bg{ 250, 23, 24, 29 };
     Color card{ 12, 255, 255, 255 };
     Color cardHover{ 24, 255, 255, 255 };
@@ -38,17 +39,34 @@ struct Theme {
     Color accent{ 255, 124, 92, 255 };
     Color red{ 255, 248, 113, 113 };
     Color green{ 255, 74, 222, 128 };
+    Color amber{ 255, 157, 93, 0 };
+    Color charging{ 255, 0, 95, 184 };
+
+    // Taskbar pill: the exact PowerVision / Fluent taskbar tokens.
+    Color pillBg{ 1, 0, 0, 0 };
+    Color pillBorder{ 0, 0, 0, 0 };
+    Color pillHover{ 22, 255, 255, 255 };
+    Color pillHoverBorder{ 34, 255, 255, 255 };
+    Color pillInk{ 255, 255, 255, 255 };
+    Color pillSub{ 255, 200, 200, 200 };
+    Color battFrame{ 255, 184, 184, 184 };
+    Color battTrack{ 36, 255, 255, 255 };
+    Color battGood{ 255, 108, 203, 95 };
+    Color battMid{ 255, 252, 225, 0 };
+    Color battLow{ 255, 255, 153, 164 };
+    Color battCharging{ 255, 96, 205, 255 };
 };
 
 struct Fonts {
-    // Bundled faces (Inter, OFL) are used when available; Segoe UI is the system fallback.
+    // The panel keeps WattPill's bundled Inter faces; the taskbar pill borrows the Windows 11
+    // Segoe UI Semibold + Fluent Icons stack so it sits naturally next to the tray.
     std::unique_ptr<FontFamily> fallbackUi;
     std::unique_ptr<FontFamily> fallbackSemi;
     std::unique_ptr<FontFamily> iconFamily;
     std::unique_ptr<FontFamily> pillFamily;
-    std::unique_ptr<Font> name, small, status, percent, pillPct;
+    std::unique_ptr<Font> name, small, status, percent;
+    std::unique_ptr<Font> pillPct, pillGlyph, pillBolt, gearGlyph;
 
-    // Inter runs a touch wider than Segoe UI at the same size, so the scale is slightly smaller.
     void Build(float scale, bool hasUi, FontFamily* regular, FontFamily* medium, FontFamily* semibold) {
         if (!regular) {
             fallbackUi = std::make_unique<FontFamily>(hasUi ? L"Segoe UI Variable Text" : L"Segoe UI");
@@ -60,23 +78,25 @@ struct Fonts {
             semibold = fallbackSemi.get();
         }
 
-        // MDL2 codepoints are stable on Windows 10 and 11; Fluent Icons remaps several of them.
         iconFamily = std::make_unique<FontFamily>(L"Segoe MDL2 Assets");
+        if (iconFamily->GetLastStatus() != Ok) iconFamily = std::make_unique<FontFamily>(L"Segoe Fluent Icons");
         if (iconFamily->GetLastStatus() != Ok) iconFamily = std::make_unique<FontFamily>(L"Segoe UI Symbol");
 
-        auto make = [&](std::unique_ptr<Font>& f, int weight, float px, bool icon) {
-            FontFamily* family = icon ? iconFamily.get() : weight == 2 ? semibold : weight == 1 ? medium : regular;
+        auto make = [&](std::unique_ptr<Font>& f, int weight, float px) {
+            FontFamily* family = weight == 2 ? semibold : weight == 1 ? medium : regular;
             f = std::make_unique<Font>(family, px * scale, FontStyleRegular, UnitPixel);
         };
-        make(name, 2, 14.5f, false);
-        make(status, 2, 13.5f, false);
-        make(small, 0, 12.0f, false);
-        make(percent, 2, 19.0f, false);
-        // The taskbar text is small: Segoe UI hints better at 13 px than Inter, and an integer
-        // size keeps GDI+ from blurring the strokes.
+        make(name, 2, 14.5f);
+        make(status, 2, 13.5f);
+        make(small, 0, 12.0f);
+        make(percent, 2, 19.0f);
+
         pillFamily = std::make_unique<FontFamily>(L"Segoe UI Semibold");
         if (pillFamily->GetLastStatus() != Ok) pillFamily = std::make_unique<FontFamily>(L"Segoe UI");
-        pillPct = std::make_unique<Font>(pillFamily.get(), 13.0f * scale, FontStyleRegular, UnitPixel);
+        pillPct = std::make_unique<Font>(pillFamily.get(), 12.0f * scale, FontStyleRegular, UnitPixel);
+        pillGlyph = std::make_unique<Font>(iconFamily.get(), 13.5f * scale, FontStyleRegular, UnitPixel);
+        pillBolt = std::make_unique<Font>(iconFamily.get(), 9.5f * scale, FontStyleRegular, UnitPixel);
+        gearGlyph = std::make_unique<Font>(iconFamily.get(), 16.5f * scale, FontStyleRegular, UnitPixel);
     }
 };
 
@@ -163,6 +183,10 @@ struct State {
     bool visible = false;
 
     int hoveredCard = -1;
+    bool gearHover = false;
+    float gearHoverT = 0;
+    float gearAngle = 0;
+    RectF settingsRect{};
 
     float scale = 1.0f;
     Theme theme;
@@ -181,6 +205,16 @@ struct State {
     RECT pillRect{};
     std::vector<RectF> cardRects;
     bool fullscreen = false;
+    bool taskbarHidden = false;
+
+    bool dragArmed = false;
+    bool dragMoved = false;
+    int dragStartX = 0;
+    int dragStartLeft = 0;
+    int dragStartRight = 0;
+
+    HWINEVENTHOOK winEventHook = nullptr;
+    UINT taskbarCreatedMessage = 0;
 
     bool uiFontVariable = true;
 } g;
@@ -311,12 +345,21 @@ std::wstring PercentText(const Card& card) {
 }
 
 bool IsLow(const Card& card) {
-    return card.reading.connected && card.reading.percent >= 0 && card.reading.percent <= 15 && !card.reading.charging;
+    return card.reading.connected && card.reading.percent >= 0 && card.reading.percent <= 20 && !card.reading.charging;
+}
+
+Color BatteryTint(const Card& card) {
+    if (card.reading.charging) return g.theme.charging;
+    if (card.reading.connected && card.reading.percent >= 0) {
+        if (card.reading.percent <= 20) return g.theme.red;
+        if (card.reading.percent <= 30) return g.theme.amber;
+    }
+    return g.theme.green;
 }
 
 Color PercentColor(const Card& card) {
     if (IsLow(card)) return g.theme.red;
-    if (card.reading.charging) return g.theme.green;
+    if (card.reading.charging) return g.theme.charging;
     if (card.reading.asleep || !card.reading.connected) return g.theme.faint;
     return g.theme.text;
 }
@@ -360,9 +403,37 @@ struct PillItem {
     const Card* card = nullptr;
     float x = 0;
     float glyphW = 0;
+    float capW = 0;
+    float boltW = 0;
+    float boltX = -1;
+    float textX = 0;
     float textW = 0;
 };
 
+const wchar_t* KindGlyph(Kind kind) {
+    switch (kind) {
+        case Kind::Mouse: return L"\uE962";
+        case Kind::Keyboard: return L"\uE765";
+        case Kind::Headset: return L"\uE7F6";
+        case Kind::Earbuds: return L"\uE7F6";
+        case Kind::Gamepad: return L"\uE7FC";
+        case Kind::Speaker: return L"\uE7F5";
+        case Kind::Phone: return L"\uE8EA";
+        default: return L"\uE702";
+    }
+}
+
+Color PillTier(const Card& card) {
+    if (card.reading.charging) return g.theme.battCharging;
+    if (card.reading.percent <= 20) return g.theme.battLow;
+    if (card.reading.percent <= 45) return g.theme.battMid;
+    return g.theme.battGood;
+}
+
+// The taskbar pill is a metric-for-metric native re-creation of PowerVision's widget:
+// a 40 DIP window with a 38 DIP, radius-5 root; 8 DIP side padding; each device has a 5 DIP
+// margin, a 13.5 DIP Fluent glyph, a 16x9.5 battery capsule, an optional 9.5 DIP bolt and 12 DIP
+// semibold text.
 void RenderPill() {
     if (!g.pill) return;
 
@@ -374,100 +445,162 @@ void RenderPill() {
     GetWindowRect(notify, &notifyRect);
     const int barW = barRect.right - barRect.left, barH = barRect.bottom - barRect.top;
     if (barW <= barH) return;   // vertical taskbar
-    const int height = barH;    // the pill and its hover fill the taskbar height
-    const float pad = 10 * g.scale;
-    const float gap = 9 * g.scale;
-    const float iconGap = 4 * g.scale;
 
-    // Only devices that have a level or are disconnected show up on the taskbar.
+    if (g.taskbarHidden) {
+        ShowWindow(g.pill, SW_HIDE);
+        return;
+    }
+
+    const int mode = std::clamp(g.settings->pillMode, 0, 2);   // 0 detailed, 1 compact, 2 percent
+    const bool showIcon = mode != 2;
+    const bool showCapsule = mode == 0;
+
+    const int height = (int)std::lround(40 * g.scale);
+    const float padX = 8 * g.scale;
+    const float margin = 5 * g.scale;
+    const float iconGap = 5 * g.scale;
+    const float glyphW = 13.5f * g.scale;
+    const float capW = 16 * g.scale, capH = 9.5f * g.scale;
+    const float capBorder = 1.1f * g.scale, capPad = 1.0f * g.scale;
+    const float nubGap = 0.8f * g.scale, nubW = 1.6f * g.scale, nubH = 4.5f * g.scale;
+    const float boltGap = 2.5f * g.scale, textGap = 4 * g.scale;
+    const float rootY = 1 * g.scale, rootH = 38 * g.scale, radius = 5 * g.scale;
+
     std::vector<const Card*> shown;
     for (const auto& card : g.cards)
-        if (card.reading.connected || card.reading.percent >= 0) shown.push_back(&card);
+        if (card.reading.connected) shown.push_back(&card);
 
     Canvas probe(4, 4);
     Graphics& pg = *probe.g;
+    const float boltAdvance = TextWidth(pg, L"\uE945", g.fonts.pillBolt.get());
 
     std::vector<PillItem> items;
-    float x = pad;
-    for (const Card* card : shown) {
+    float x = padX + margin;
+    for (size_t i = 0; i < shown.size(); i++) {
+        const Card* card = shown[i];
         PillItem item;
         item.card = card;
         item.x = x;
-        item.glyphW = 16 * g.scale;
+        item.glyphW = showIcon ? glyphW : 0;
+        item.capW = showCapsule ? capW : 0;
         item.textW = TextWidth(pg, PercentText(*card), g.fonts.pillPct.get());
-        items.push_back(item);
-        x += item.glyphW + iconGap + item.textW;
-        x += gap;
-    }
-    const bool empty = items.empty();
-    float emptyGlyphW = 16 * g.scale;
-    if (empty) x = pad + emptyGlyphW + iconGap + g.fonts.pillPct->GetSize() * 1.2f + gap;
 
-    const int width = std::max((int)std::lround(x - gap + pad), (int)std::lround(46 * g.scale));
+        float cursor = x;
+        if (showIcon) cursor += glyphW + iconGap;
+        if (showCapsule) cursor += capW + nubGap + nubW;
+        if (card->reading.charging) {
+            item.boltW = boltAdvance;
+            item.boltX = cursor + boltGap;
+            cursor = item.boltX + boltAdvance;
+        }
+        item.textX = cursor + textGap;
+        items.push_back(item);
+        x = item.textX + item.textW + margin;
+        if (i + 1 < shown.size()) x += margin;
+    }
+
+    const bool empty = items.empty();
+    float emptyW = 0;
+    if (empty) {
+        emptyW = TextWidth(pg, L"\u2014", g.fonts.pillPct.get());
+        x = padX + 4 * g.scale + glyphW + 5 * g.scale + emptyW + 4 * g.scale + padX;
+    }
+
+    const int width = std::max((int)std::lround(x), (int)std::lround(46 * g.scale));
     Canvas canvas(width, height);
     Graphics& g2 = *canvas.g;
     g2.SetPixelOffsetMode(PixelOffsetModeNone);
 
-    // The pill lives on the taskbar, so its contrast follows the taskbar, not the panel theme.
-    const bool barLight = TaskbarIsLight();
-    const Color ink = barLight ? Color(255, 22, 22, 26) : Color(255, 246, 247, 250);
-    const Color dimInk = barLight ? Color(255, 70, 70, 76) : Color(255, 168, 170, 178);
-    const Color pillGreen = barLight ? Color(255, 30, 150, 70) : g.theme.green;
-    const Color pillRed = barLight ? Color(255, 200, 30, 30) : g.theme.red;
-
-    // Alpha 1 over the whole strip: invisible on screen, but it keeps the window clickable.
-    FillRound(g2, RectF(0, 0, (float)width, (float)height), height / 2.0f, Color(8, 0, 0, 0));
-
-    // Light hover wash, inset from the strip edges so it reads as a small rounded button instead
-    // of a full-height block (the tray hover is ~32 px on a 48 px taskbar).
+    // Alpha 1 over the whole strip keeps the window clickable. The optional Fluent taskbar plate
+    // and the hover wash are painted on top.
+    FillRound(g2, RectF(0, rootY, (float)width, rootH), radius, Color(1, 0, 0, 0));
+    if (g.settings->pillBackground) {
+        FillRound(g2, RectF(0, rootY, (float)width, rootH), radius, g.theme.pillBg);
+        StrokeRound(g2, RectF(0.5f, rootY + 0.5f, width - 1.0f, rootH - 1.0f), radius,
+                    g.theme.pillBorder, 1.0f);
+    }
     if (g.pillHover) {
-        const float insetX = 3 * g.scale, insetY = 8 * g.scale;
-        FillRound(g2, RectF(insetX, insetY, width - 2 * insetX, height - 2 * insetY), 4 * g.scale,
-                  WithAlpha(barLight ? Color(255, 0, 0, 0) : Color(255, 255, 255, 255),
-                            barLight ? 10 : 12));
+        FillRound(g2, RectF(0, rootY, (float)width, rootH), radius, g.theme.pillHover);
+        StrokeRound(g2, RectF(0.5f, rootY + 0.5f, width - 1.0f, rootH - 1.0f), radius,
+                    g.theme.pillHoverBorder, 1.0f);
     }
 
-    const float cy = height / 2.0f;
+    const float cy = rootY + rootH / 2;
     if (empty) {
-        SolidBrush dot(dimInk);
-        for (int i = 0; i < 3; i++)
-            g2.FillEllipse(&dot, RectF(pad + i * 10 * g.scale, cy - 2 * g.scale, 4 * g.scale, 4 * g.scale));
+        Text(g2, L"\uE702", g.fonts.pillGlyph.get(),
+             RectF(padX + 4 * g.scale, cy - 9 * g.scale, glyphW + 2 * g.scale, 18 * g.scale),
+             g.theme.pillSub, StringAlignmentNear);
+        Text(g2, L"\u2014", g.fonts.pillPct.get(),
+             RectF(padX + 4 * g.scale + glyphW + 5 * g.scale, cy - 9 * g.scale, emptyW + 2 * g.scale, 18 * g.scale),
+             g.theme.pillSub, StringAlignmentNear);
     }
 
     for (const auto& item : items) {
         const Card& card = *item.card;
-        const BYTE alpha = card.reading.asleep ? 110 : 255;
-        Color iconColor = ink;
-        if (IsLow(card)) iconColor = pillRed;
-        else if (card.reading.charging || card.reading.full) iconColor = pillGreen;
-        if (card.reading.asleep) iconColor = dimInk;
-        g.icons.Draw(g2, IconFor(card.reading.kind),
-                     RectF(item.x, (height - item.glyphW) / 2, item.glyphW, item.glyphW),
-                     iconColor, alpha);
+        const bool off = card.reading.asleep || !card.reading.connected;
+        const BYTE alpha = card.reading.asleep ? 150 : 255;
 
-        const float textX = item.x + item.glyphW + iconGap;
+        if (showIcon) {
+            Text(g2, KindGlyph(card.reading.kind), g.fonts.pillGlyph.get(),
+                 RectF(item.x, cy - 9 * g.scale, item.glyphW + 2 * g.scale, 18 * g.scale),
+                 WithAlpha(off ? g.theme.pillSub : g.theme.pillInk, alpha), StringAlignmentNear);
+        }
+
+        if (showCapsule) {
+            const float cx = item.x + item.glyphW + iconGap;
+            const float capTop = cy - capH / 2;
+            FillRound(g2, RectF(cx, capTop, capW, capH), 2.2f * g.scale, g.theme.battTrack);
+            if (card.reading.percent >= 0) {
+                const float innerW = capW - 2 * (capBorder + capPad);
+                const float fillW = std::clamp(card.reading.percent / 100.0f * innerW,
+                                               1.0f * g.scale, innerW);
+                FillRound(g2, RectF(cx + capBorder + capPad, capTop + capBorder + capPad,
+                                    fillW, capH - 2 * (capBorder + capPad)),
+                          1.0f * g.scale, WithAlpha(PillTier(card), alpha));
+            }
+            StrokeRound(g2, RectF(cx + 0.55f * g.scale, capTop + 0.55f * g.scale,
+                                  capW - 1.1f * g.scale, capH - 1.1f * g.scale),
+                        2.0f * g.scale, WithAlpha(g.theme.battFrame, alpha), capBorder);
+            FillRound(g2, RectF(cx + capW + nubGap, cy - nubH / 2, nubW, nubH),
+                      1.0f * g.scale, WithAlpha(g.theme.battFrame, alpha));
+        }
+
+        if (item.boltX >= 0) {
+            Text(g2, L"\uE945", g.fonts.pillBolt.get(),
+                 RectF(item.boltX, cy - 8 * g.scale, item.boltW + 2 * g.scale, 16 * g.scale),
+                 WithAlpha(g.theme.battCharging, alpha), StringAlignmentNear);
+        }
+
+        Color textColor = off ? g.theme.pillSub
+                          : card.reading.charging ? g.theme.battCharging
+                          : card.reading.percent <= 20 ? g.theme.battLow : g.theme.pillInk;
         Text(g2, PercentText(card), g.fonts.pillPct.get(),
-             RectF(textX, cy - 10 * g.scale, item.textW + 2, 17 * g.scale),
-             WithAlpha(IsLow(card) ? pillRed : card.reading.charging ? pillGreen
-                       : card.reading.asleep ? dimInk : ink, alpha),
-             StringAlignmentNear);
-
+             RectF(item.textX, cy - 9 * g.scale, item.textW + 2 * g.scale, 18 * g.scale),
+             WithAlpha(textColor, alpha), StringAlignmentNear);
     }
 
     int px = 0, py = 0;
-    if (g.settings->pillPlacement == 1) {
-        // On the taskbar, left of the tray (the classic position).
-        px = notifyRect.left - width - (int)std::lround(6 * g.scale);
-        py = barRect.top;
-        if (px < barRect.left + 80) return;   // crowded taskbar: do not cover app buttons
+    const bool barAtTop = barRect.top < (int)std::lround(40 * g.scale);
+    if (g.settings->pillManual) {
+        px = barRect.right - (int)std::lround(g.settings->pillOffset * g.scale) - width;
+    } else if (g.settings->pillPlacement == 1) {
+        px = notifyRect.left - width - (int)std::lround(8 * g.scale);
     } else {
-        // Float just above the clock; the right edge stays put and the pill grows to the left as
-        // devices connect, so it never covers taskbar buttons, toolbars or widgets.
-        const int pillRight = notifyRect.right - (int)std::lround(12 * g.scale);
-        px = pillRight - width;
-        py = barRect.top - height - (int)std::lround(4 * g.scale);
-        if (px < barRect.left + 8) return;
+        px = notifyRect.right - (int)std::lround(12 * g.scale) - width;
     }
+    const int minLeft = barRect.left + (int)std::lround(4 * g.scale);
+    const int maxLeft = barRect.right - width - (int)std::lround(4 * g.scale);
+    if (maxLeft < minLeft) return;
+    px = std::clamp(px, minLeft, maxLeft);
+
+    if (g.settings->pillPlacement == 1) {
+        py = barRect.top + (barH - height) / 2;
+    } else if (barAtTop) {
+        py = barRect.bottom + (int)std::lround(4 * g.scale);
+    } else {
+        py = barRect.top - height - (int)std::lround(4 * g.scale);
+    }
+
     g.pillRect = { px, py, px + width, py + height };
     canvas.Present(g.pill, px, py);
 }
@@ -476,12 +609,23 @@ void RenderPill() {
 
 int MeasurePanelHeight(int count) {
     const int pad = (int)std::lround(16 * g.scale);
-    const int header = 0;
+    const int header = (int)std::lround(44 * g.scale);
     const int cardH = (int)std::lround(80 * g.scale);
     const int gap = (int)std::lround(10 * g.scale);
-    const int footer = 0;
     const int body = count > 0 ? count * cardH + (count - 1) * gap : (int)std::lround(84 * g.scale);
-    return pad + header + body + footer + pad;
+    return pad + header + body + pad;
+}
+
+std::wstring PanelSummary() {
+    const int n = (int)g.cards.size();
+    if (n == 0) return Tr(L"Нет устройств", L"No devices");
+    if (g.settings->language == 2 || (g.settings->language == 0 && !RussianUi()))
+        return Fmt(L"%d device%s", n, n == 1 ? L"" : L"s");
+    const int mod100 = n % 100, mod10 = n % 10;
+    if (mod100 >= 11 && mod100 <= 14) return Fmt(L"%d устройств", n);
+    if (mod10 == 1) return Fmt(L"%d устройство", n);
+    if (mod10 >= 2 && mod10 <= 4) return Fmt(L"%d устройства", n);
+    return Fmt(L"%d устройств", n);
 }
 
 float TargetPercent(const Card& card) {
@@ -536,8 +680,6 @@ void DrawCard(Graphics& g2, const Card& card, RectF box) {
     Text(g2, StatusLine(card), g.fonts.status.get(), RectF(textX, box.Y + 33 * g.scale, textW, 20 * g.scale),
          WithAlpha(statusColor, textAlpha), StringAlignmentNear, true);
 
-
-
     // Ready-made battery icons (Fluent): the level morphs between two neighbouring icons, and the
     // number counts up, so a level change reads as motion instead of a jump.
     const float shown = g.ringValues.count(card.reading.id) ? g.ringValues[card.reading.id]
@@ -565,9 +707,31 @@ void RenderPanel() {
     FillRound(g2, RectF(0, 0, (float)width, (float)height), (float)radius, g.theme.bg);
     StrokeRound(g2, RectF(0.5f, 0.5f, width - 1.0f, height - 1.0f), (float)radius, g.theme.border, 1.0f);
 
+    // ---- header: wordmark, summary, refresh and settings
+    const int header = (int)std::lround(44 * g.scale);
+    Text(g2, L"WattPill", g.fonts.name.get(), RectF((float)pad, 10 * g.scale, 200 * g.scale, 22 * g.scale),
+         g.theme.text, StringAlignmentNear);
+    Text(g2, PanelSummary(), g.fonts.small.get(),
+         RectF((float)pad, 30 * g.scale, 200 * g.scale, 16 * g.scale), g.theme.sub, StringAlignmentNear, true);
+
+    g.settingsRect = RectF((float)(width - pad) - 32 * g.scale, 10 * g.scale, 32 * g.scale, 32 * g.scale);
+    if (g.gearHoverT > 0.01f)
+        FillRound(g2, g.settingsRect, 8 * g.scale, WithAlpha(g.theme.text, (BYTE)std::lround(16 * g.gearHoverT)));
+    {
+        const float cx = g.settingsRect.X + g.settingsRect.Width / 2;
+        const float cy = g.settingsRect.Y + g.settingsRect.Height / 2;
+        GraphicsState state = g2.Save();
+        g2.TranslateTransform(cx, cy);
+        g2.RotateTransform(g.gearAngle);
+        g2.TranslateTransform(-cx, -cy);
+        Text(g2, L"\uE713", g.fonts.gearGlyph.get(), g.settingsRect,
+             g.gearHoverT > 0.01f ? g.theme.text : WithAlpha(g.theme.text, 200), StringAlignmentCenter);
+        g2.Restore(state);
+    }
+
     // ---- cards
     g.cardRects.clear();
-    float y = (float)pad;
+    float y = (float)(pad + header);
     if (count == 0) {
         RectF box((float)pad, y, (float)(width - pad * 2), 84 * g.scale);
         FillRound(g2, box, 16 * g.scale, g.theme.card);
@@ -585,48 +749,59 @@ void RenderPanel() {
         }
     }
 
-    // ---- footer
-
-
-    // ---- place above the notification area
-    RECT bar{}, notify{};
+    // ---- anchor above the widget / taskbar
+    RECT bar{};
     HWND taskbar = FindWindowW(L"Shell_TrayWnd", nullptr);
-    HWND tray = taskbar ? FindWindowExW(taskbar, nullptr, L"TrayNotifyWnd", nullptr) : nullptr;
-    int panelX = 0, panelY = 0;
-    if (taskbar && tray) {
-        GetWindowRect(taskbar, &bar);
-        GetWindowRect(tray, &notify);
-        if (g.settings->pillPlacement == 1) {
-            panelX = notify.right - width - (int)std::lround(6 * g.scale);
-            if (bar.top < 40) panelY = bar.bottom + (int)std::lround(8 * g.scale);
-            else panelY = bar.top - height - (int)std::lround(8 * g.scale);
-        } else {
-            const int anchorRight = g.pillRect.right > 0 ? g.pillRect.right : notify.right;
-            panelX = anchorRight - width - (int)std::lround(6 * g.scale);
-            if (bar.top < 40) panelY = bar.bottom + (int)std::lround(8 * g.scale);
-            else if (g.pillRect.top > 0 && g.pillRect.top < bar.top)
-                panelY = g.pillRect.top - height - (int)std::lround(8 * g.scale);
-            else panelY = bar.top - height - (int)std::lround(8 * g.scale);
-        }
-    } else {
-        RECT work{};
-        SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
-        panelX = work.right - width - 12;
-        panelY = work.bottom - height - 12;
-    }
     RECT work{};
-    SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
+    bool haveBar = taskbar != nullptr;
+    if (haveBar) {
+        GetWindowRect(taskbar, &bar);
+        HMONITOR mon = MonitorFromWindow(taskbar, MONITOR_DEFAULTTONEAREST);
+        MONITORINFO mi{ sizeof(mi) };
+        if (mon && GetMonitorInfoW(mon, &mi)) work = mi.rcWork;
+        else SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
+    } else {
+        SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
+    }
+    if (work.right <= work.left || work.bottom <= work.top) {
+        work = { 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN) };
+    }
+    const bool barAtTop = haveBar && bar.top < (int)std::lround(40 * g.scale);
+    const int anchorLeft = g.pillRect.right > g.pillRect.left ? g.pillRect.left
+                                                               : (haveBar ? bar.right - 100 : work.right - 100);
+    const int anchorRight = g.pillRect.right > g.pillRect.left ? g.pillRect.right
+                                                                : (haveBar ? bar.right : work.right);
+    const int center = (anchorLeft + anchorRight) / 2;
+    int panelX = center - width / 2;
+    int panelY = 0;
+    bool belowTaskbar = false;
+    if (g.settings->pillPlacement == 1) {
+        belowTaskbar = barAtTop;
+        panelY = barAtTop ? work.top + (int)std::lround(8 * g.scale)
+                          : work.bottom - height - (int)std::lround(8 * g.scale);
+    } else if (barAtTop) {
+        belowTaskbar = true;
+        const int anchorTop = g.pillRect.bottom > g.pillRect.top ? g.pillRect.bottom : work.top;
+        panelY = anchorTop + (int)std::lround(8 * g.scale);
+    } else if (g.pillRect.top > 0 && g.pillRect.top < bar.top) {
+        panelY = g.pillRect.top - height - (int)std::lround(8 * g.scale);
+    } else {
+        panelY = work.bottom - height - (int)std::lround(8 * g.scale);
+    }
     panelX = std::clamp(panelX, (int)work.left + 8, (int)work.right - width - 8);
     panelY = std::clamp(panelY, (int)work.top + 8, (int)work.bottom - height - 8);
 
-    g.panelPos = { panelX, panelY };
-    canvas.Present(g.panel, panelX, panelY, (BYTE)std::lround(255 * std::clamp(g.reveal, 0.0f, 1.0f)));
+    // A short slide (about 10 DIP) plus the fade, like the shell's own flyouts.
+    const int slide = (int)std::lround((1.0f - std::clamp(g.reveal, 0.0f, 1.0f)) * 10 * g.scale);
+    const int visualY = panelY + (belowTaskbar ? -slide : slide);
+    g.panelPos = { panelX, visualY };
+    canvas.Present(g.panel, panelX, visualY, (BYTE)std::lround(255 * std::clamp(g.reveal, 0.0f, 1.0f)));
 }
 
 // ------------------------------------------------------------------ theme & windows
 
 void BuildTheme() {
-    const bool light = TaskbarIsLight();
+    const bool light = AppIsLight();
     if (light) {
         g.theme.bg = Color(242, 249, 249, 249);
         g.theme.card = Color(255, 255, 255, 255);
@@ -637,6 +812,8 @@ void BuildTheme() {
         g.theme.faint = Color(255, 142, 142, 150);
         g.theme.red = Color(255, 215, 0, 21);
         g.theme.green = Color(255, 36, 138, 61);
+        g.theme.amber = Color(255, 157, 93, 0);
+        g.theme.charging = Color(255, 0, 95, 184);
     } else {
         g.theme.bg = Color(236, 32, 32, 32);
         g.theme.card = Color(255, 43, 43, 43);
@@ -647,6 +824,38 @@ void BuildTheme() {
         g.theme.faint = Color(255, 124, 124, 130);
         g.theme.red = Color(255, 255, 69, 58);
         g.theme.green = Color(255, 48, 209, 88);
+        g.theme.amber = Color(255, 252, 225, 0);
+        g.theme.charging = Color(255, 96, 205, 255);
+    }
+
+    const bool taskbarLight = TaskbarIsLight();
+    const COLORREF accent = SystemAccentColor(taskbarLight);
+    if (taskbarLight) {
+        g.theme.pillBg = Color(133, 255, 255, 255);
+        g.theme.pillBorder = Color(30, 0, 0, 0);
+        g.theme.pillHover = Color(20, 0, 0, 0);
+        g.theme.pillHoverBorder = Color(28, 0, 0, 0);
+        g.theme.pillInk = Color(255, 26, 26, 26);
+        g.theme.pillSub = Color(255, 90, 90, 90);
+        g.theme.battFrame = Color(255, 107, 107, 107);
+        g.theme.battTrack = Color(26, 0, 0, 0);
+        g.theme.battGood = Color(255, 15, 123, 15);
+        g.theme.battMid = Color(255, 157, 93, 0);
+        g.theme.battLow = Color(255, 196, 43, 28);
+        g.theme.battCharging = Color(255, GetRValue(accent), GetGValue(accent), GetBValue(accent));
+    } else {
+        g.theme.pillBg = Color(102, 44, 44, 44);
+        g.theme.pillBorder = Color(34, 255, 255, 255);
+        g.theme.pillHover = Color(22, 255, 255, 255);
+        g.theme.pillHoverBorder = Color(34, 255, 255, 255);
+        g.theme.pillInk = Color(255, 255, 255, 255);
+        g.theme.pillSub = Color(255, 200, 200, 200);
+        g.theme.battFrame = Color(255, 184, 184, 184);
+        g.theme.battTrack = Color(36, 255, 255, 255);
+        g.theme.battGood = Color(255, 108, 203, 95);
+        g.theme.battMid = Color(255, 252, 225, 0);
+        g.theme.battLow = Color(255, 255, 153, 164);
+        g.theme.battCharging = Color(255, 96, 205, 255);
     }
 }
 
@@ -679,11 +888,10 @@ void ShowPanelInternal() {
     if (!g.panel) return;
     if (!g.reveal) g.reveal = 0.0f;
     g.animLast = 0;
-    ShowWindow(g.panel, SW_SHOWNOACTIVATE);
+    RenderPanel();
     ShowWindow(g.panel, SW_SHOWNOACTIVATE);
     SetWindowPos(g.panel, HWND_TOPMOST, g.panelPos.x, g.panelPos.y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
     SetTimer(g.panel, kPanelTimerAnim, 33, nullptr);
-    RenderPanel();
 }
 
 void HidePanelInternal() {
@@ -705,6 +913,12 @@ bool CursorInside(HWND wnd, const RECT& rect) {
 void TrackLeave(HWND wnd) {
     TRACKMOUSEEVENT t{ sizeof(t), TME_LEAVE, wnd, 0 };
     TrackMouseEvent(&t);
+}
+
+// Foreground changes are the main reason the taskbar rises above our topmost pill. React at once
+// instead of waiting for the next guard tick.
+void CALLBACK OnForegroundEvent(HWINEVENTHOOK, DWORD, HWND, LONG, LONG, DWORD, DWORD) {
+    if (g.pill) PostMessageW(g.pill, WM_APP_REFRESH_UI, 0, 0);
 }
 
 // Borderless ("fullscreen windowed") games cover the whole monitor, including the strip the
@@ -867,6 +1081,17 @@ void Animate() {
         g.spin += dt * 150.0f;
         if (g.spin >= 360.0f) g.spin -= 360.0f;
     }
+
+    // The gear eases from grey to white and turns 60 degrees under the pointer.
+    const float gearTarget = g.gearHover ? 1.0f : 0.0f;
+    if (std::fabs(gearTarget - g.gearHoverT) > 0.004f) {
+        g.gearHoverT += (gearTarget - g.gearHoverT) * std::min(1.0f, dt * 14.0f);
+        active = true;
+    } else {
+        g.gearHoverT = gearTarget;
+    }
+    g.gearAngle = g.gearHoverT * 60.0f;
+
     if (g.reveal < 1.0f) {
         g.reveal = std::min(1.0f, g.reveal + dt * 8.0f);
         active = true;
@@ -883,21 +1108,62 @@ void Animate() {
 
 LRESULT CALLBACK PillProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
-        case WM_MOUSEMOVE:
+        case WM_MOUSEACTIVATE:
+            return MA_NOACTIVATE;
+        case WM_MOUSEMOVE: {
+            if (g.dragArmed && (GetKeyState(VK_LBUTTON) & 0x8000)) {
+                POINT p{};
+                GetCursorPos(&p);
+                const int dx = p.x - g.dragStartX;
+                if (!g.dragMoved && std::abs(dx) >= GetSystemMetrics(SM_CXDRAG)) g.dragMoved = true;
+                if (g.dragMoved) {
+                    HWND taskbar = FindWindowW(L"Shell_TrayWnd", nullptr);
+                    RECT bar{};
+                    if (taskbar && GetWindowRect(taskbar, &bar) && g.pillRect.right > g.pillRect.left) {
+                        const int width = g.pillRect.right - g.pillRect.left;
+                        const int minLeft = bar.left + (int)std::lround(4 * g.scale);
+                        const int maxLeft = bar.right - width - (int)std::lround(4 * g.scale);
+                        const int left = std::clamp(g.dragStartLeft + dx, minLeft, maxLeft);
+                        g.settings->pillManual = true;
+                        g.settings->pillOffset =
+                            std::clamp((int)std::lround((bar.right - (left + width)) / g.scale), 0, 4000);
+                        RenderPill();
+                    }
+                }
+                return 0;
+            }
             if (!g.pillHover) {
                 g.pillHover = true;
                 TrackLeave(h);
                 RenderPill();
             }
             return 0;
-        case WM_MOUSELEAVE:
-            g.pillHover = false;
-            RenderPill();
-            // Leaving the pill also counts as "away": the panel closes shortly unless the cursor
-            // lands on it (then the panel's own WM_MOUSEMOVE cancels the timer).
-            if (g.visible && g.panel) SetTimer(g.panel, kPanelTimerHide, 200, nullptr);
-            return 0;
+        }
+        case WM_LBUTTONDOWN:
+            if ((GetKeyState(VK_SHIFT) < 0 || g.settings->pillUnlocked) && g.pillRect.right > g.pillRect.left) {
+                POINT p{};
+                GetCursorPos(&p);
+                g.dragArmed = true;
+                g.dragMoved = false;
+                g.dragStartX = p.x;
+                g.dragStartLeft = g.pillRect.left;
+                g.dragStartRight = g.pillRect.right;
+                SetCapture(h);
+                return 0;
+            }
+            break;
         case WM_LBUTTONUP: {
+            if (g.dragArmed) {
+                const bool moved = g.dragMoved;
+                g.dragArmed = false;
+                g.dragMoved = false;
+                if (GetCapture() == h) ReleaseCapture();
+                if (moved) {
+                    if (g.hooks.settingsChanged) g.hooks.settingsChanged();
+                    return 0;
+                }
+                // A click without movement is still a click: open/close the panel below.
+            }
             // Debounce: a burst of clicks is one gesture, not a flicker of open/close animations.
             static ULONGLONG lastToggle = 0;
             const ULONGLONG now = GetTickCount64();
@@ -907,15 +1173,45 @@ LRESULT CALLBACK PillProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             else ShowPanelInternal();
             return 0;
         }
+        case WM_CAPTURECHANGED:
+            g.dragArmed = false;
+            g.dragMoved = false;
+            return 0;
+        case WM_SETCURSOR:
+            if (LOWORD(lp) == HTCLIENT) {
+                SetCursor(LoadCursorW(nullptr, (GetKeyState(VK_SHIFT) < 0 || g.dragArmed || g.settings->pillUnlocked)
+                                                 ? IDC_SIZEWE : IDC_ARROW));
+                return TRUE;
+            }
+            break;
+        case WM_MOUSELEAVE:
+            g.pillHover = false;
+            RenderPill();
+            // Leaving the pill also counts as "away": the panel closes shortly unless the cursor
+            // lands on it (then the panel's own WM_MOUSEMOVE cancels the timer).
+            if (g.visible && g.panel) SetTimer(g.panel, kPanelTimerHide, 200, nullptr);
+            return 0;
         case WM_RBUTTONUP:
             if (g.hooks.menu) g.hooks.menu();
             return 0;
+        case WM_APP_REFRESH_UI:
+        case WM_DISPLAYCHANGE:
+            Tick();
+            return 0;
+        default:
+            if (g.taskbarCreatedMessage && msg == g.taskbarCreatedMessage) {
+                Tick();
+                return 0;
+            }
+            break;
     }
     return DefWindowProcW(h, msg, wp, lp);
 }
 
 LRESULT CALLBACK PanelProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
+        case WM_MOUSEACTIVATE:
+            return MA_NOACTIVATE;
         case WM_MOUSEMOVE: {
             KillTimer(h, kPanelTimerHide);
             TrackLeave(h);
@@ -927,14 +1223,19 @@ LRESULT CALLBACK PanelProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                     break;
                 }
             }
-            if (cardIndex != g.hoveredCard) {
+            int button = g.settingsRect.Contains((float)p.x, (float)p.y) ? 1 : 0;
+            if (cardIndex != g.hoveredCard || (button == 1) != g.gearHover) {
                 g.hoveredCard = cardIndex;
+                g.gearHover = button == 1;
+                SetTimer(h, kPanelTimerAnim, 33, nullptr);
                 RenderPanel();
             }
             return 0;
         }
         case WM_MOUSELEAVE:
-                    g.hoveredCard = -1;
+            g.hoveredCard = -1;
+            g.gearHover = false;
+            SetTimer(h, kPanelTimerAnim, 33, nullptr);
             SetTimer(h, kPanelTimerHide, 200, nullptr);
             RenderPanel();
             return 0;
@@ -952,10 +1253,23 @@ LRESULT CALLBACK PanelProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             }
             return 0;
         case WM_LBUTTONUP:
+            if (g.gearHover) {
+                if (g.hooks.menu) g.hooks.menu();
+            }
             return 0;
         case WM_RBUTTONUP:
             if (g.hooks.menu) g.hooks.menu();
             return 0;
+        case WM_APP_REFRESH_UI:
+        case WM_DISPLAYCHANGE:
+            Tick();
+            return 0;
+        default:
+            if (g.taskbarCreatedMessage && msg == g.taskbarCreatedMessage) {
+                Tick();
+                return 0;
+            }
+            break;
     }
     return DefWindowProcW(h, msg, wp, lp);
 }
@@ -1032,6 +1346,11 @@ bool Init(HINSTANCE inst, Settings* settings, Hooks hooks) {
     g.pill = CreateLayeredWindow(L"WattPillPill", PillProc, L"WattPill");
     if (!g.pill || !g.panel) return false;
 
+    g.taskbarCreatedMessage = RegisterWindowMessageW(L"TaskbarCreated");
+    g.winEventHook = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, nullptr,
+                                     OnForegroundEvent, 0, 0,
+                                     WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+
     RebuildFonts();
 
     if (g.settings->showPill) {
@@ -1077,6 +1396,10 @@ void ClearLayered(HWND wnd) {
 }
 
 void Shutdown() {
+    if (g.winEventHook) {
+        UnhookWinEvent(g.winEventHook);
+        g.winEventHook = nullptr;
+    }
     if (g.pill) {
         ClearLayered(g.pill);
         ShowWindow(g.pill, SW_HIDE);
@@ -1114,7 +1437,7 @@ void SetCards(std::vector<Card> cards) {
 void Tick() {
     if (!g.pill || !g.panel) return;
 
-    const bool fs = FullscreenApp();
+    const bool fs = g.settings->hideFullscreen && FullscreenApp();
     if (fs != g.fullscreen) {
         g.fullscreen = fs;
         ShowWindow(g.pill, fs ? SW_HIDE : SW_SHOWNOACTIVATE);
@@ -1135,6 +1458,25 @@ void Tick() {
         }
         RECT bar{};
         GetWindowRect(taskbar, &bar);
+        RECT monRect{};
+        HMONITOR mon = MonitorFromWindow(taskbar, MONITOR_DEFAULTTONEAREST);
+        MONITORINFO mi{ sizeof(mi) };
+        if (mon && GetMonitorInfoW(mon, &mi)) monRect = mi.rcMonitor;
+        if (monRect.right <= monRect.left || monRect.bottom <= monRect.top)
+            monRect = { 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN) };
+        const bool barHidden = !IsWindowVisible(taskbar) || bar.right <= bar.left || bar.bottom <= bar.top ||
+                               bar.top >= monRect.bottom - 2 || bar.bottom <= monRect.top + 2;
+        if (barHidden != g.taskbarHidden) {
+            g.taskbarHidden = barHidden;
+            if (barHidden) {
+                ShowWindow(g.pill, SW_HIDE);
+                HidePanelInternal();
+            } else if (g.settings->showPill && !g.fullscreen) {
+                ShowWindow(g.pill, SW_SHOWNOACTIVATE);
+                RenderPill();
+            }
+        }
+        if (g.taskbarHidden) return;
         static RECT lastBar{};
         if (memcmp(&bar, &lastBar, sizeof(RECT)) != 0) {
             lastBar = bar;
@@ -1163,11 +1505,7 @@ void Tick() {
     }
 
     RECT panelRect{};
-    if (g.visible) {
-        GetWindowRect(g.panel, &panelRect);
-        if (!CursorInside(g.panel, panelRect) && !CursorInside(g.pill, g.pillRect))
-            HidePanelInternal();
-    }
+    (void)panelRect;
 }
 
 void SetSettings(const Settings& settings) {
@@ -1175,7 +1513,7 @@ void SetSettings(const Settings& settings) {
     *g.settings = settings;
     BuildTheme();
     RebuildFonts();
-    if (g.settings->showPill) {
+    if (g.settings->showPill && !g.taskbarHidden && !g.fullscreen) {
         ShowWindow(g.pill, SW_SHOWNOACTIVATE);
         RenderPill();
     } else {
@@ -1191,6 +1529,7 @@ void OnSystemSettingsChanged() {
 }
 
 void ShowPanelNow() { ShowPanelInternal(); }
+void TogglePanelNow() { if (g.visible) HidePanelInternal(); else ShowPanelInternal(); }
 
 std::wstring FontReport() {
     using namespace Gdiplus;

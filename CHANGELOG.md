@@ -4,6 +4,33 @@ All notable changes to WattPill are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- PowerVision-style taskbar anchoring: the pill is inset and centered in the taskbar, follows its
+  height, and hides while the taskbar auto-hides. A 300 ms guard plus a foreground WinEvent hook
+  keeps it above `Shell_TrayWnd` without `SetParent`; Explorer restarts and display changes
+  re-anchor it.
+- Manual pill position: Shift-drag, *Placement → Move widget*, and *Placement → Reset position*.
+  The offset is stored in `settings.ini`.
+- Pill styles: detailed (glyph, battery capsule, percentage), compact (glyph and percentage) and
+  percent only, plus an optional Fluent background plate.
+- *Hide in fullscreen* option.
+- Panel header with the WattPill wordmark, device count and a settings gear; the gear opens the
+  same menu as right-click. *Open panel* is also in the tray menu.
+- Panel slide-and-fade animation.
+
+### Changed
+
+- Redesigned the pill to match PowerVision's taskbar widget metric for metric: 40 DIP height,
+  radius 5, inset taskbar placement, Fluent glyphs, 16×9.5 battery capsule with nub and charging
+  bolt, 12 px semibold percentages and the Windows 11 taskbar palette.
+- The panel keeps WattPill's own visual language (Inter, neutral cards, violet accent, Fluent
+  battery marks); it gained the compact header and gear instead of adopting PowerVision's flyout
+  skin.
+- Devices that stop answering are removed instead of being shown as disconnected.
+
 ## [2.0.0] — 2026-11-24
 
 ### Changed

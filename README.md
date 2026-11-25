@@ -34,8 +34,16 @@ measurement, and it is labelled while the data is still thin.
 - **All native, no Chromium.** ~1.8 MB exe: the pill, the panel, device polling and history are
   plain Win32 + GDI+. No WebView2, no Electron, no background Chromium processes. Idle CPU is
   0 ms/s and the working set is under 25 MB.
-- **Sits above the clock.** The pill floats just above the clock and grows to the left as devices
-  connect, so it never covers taskbar buttons, toolbars or widgets.
+- **Sits on the taskbar, not over it.** The pill is inset into the taskbar, centered vertically, and
+  uses the same height and hover weight as the Explorer tray buttons. *Placement → On the taskbar*
+  docks it left of the tray; *Above the clock* floats it over the clock. Shift-drag (or
+  right-click → *Move widget*) slides it anywhere along the bar; *Reset position* puts it back.
+- **A panel that behaves like a shell flyout.** It opens centered on the pill with a short slide and
+  fade, keeps WattPill's own look (Inter, grouped cards, violet forecast accent), and adds a compact
+  header with the device count and a settings gear. The same settings open on right-click.
+- **A pill that matches the taskbar.** Detailed (glyph, mini battery capsule, percentage), compact
+  (glyph and percentage) or percent-only; optional Fluent background plate. The gear turns and
+  brightens under the pointer.
 - **Starts with Windows.** Enabled on the first run; a checkbox in the right-click menu turns it
   off again (a single `HKCU\…\Run` value, no service, no admin rights).
 - **Follows Windows.** Light/dark theme comes from the taskbar and updates live; 100–200 % DPI
@@ -62,6 +70,10 @@ Windows 10) or the uninstaller in the install folder. Your settings and history 
 
 The pill floats above the clock by default. Right-click → Placement → *On the taskbar* puts it
 left of the tray; *Above the clock* brings it back. Both are shown below.
+
+Shift-drag the pill to move it along the taskbar, or enable *Placement → Move widget* to drag it
+without holding Shift. *Placement → Reset position* returns it to the default spot; the offset is
+saved in `settings.ini` (`pill_manual`, `pill_offset`).
 
 ![Pill placement](docs/placement.png)
 

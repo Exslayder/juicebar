@@ -39,10 +39,18 @@ constexpr UINT_PTR TIMER_SAVE = 2;
 
 enum MenuId : UINT {
     ID_REFRESH = 100,
+    ID_PANEL = 130,
     ID_AUTOSTART = 150,
     ID_QUIT = 160,
     ID_PLACE_CLOCK = 170,
     ID_PLACE_TASKBAR = 171,
+    ID_PLACE_RESET = 172,
+    ID_MOVE = 173,
+    ID_MODE_DETAILED = 174,
+    ID_MODE_COMPACT = 175,
+    ID_MODE_PERCENT = 176,
+    ID_PILL_BG = 177,
+    ID_HIDE_FULLSCREEN = 178,
     ID_LANG_AUTO = 180,
     ID_LANG_RU = 181,
     ID_LANG_EN = 182,
@@ -149,6 +157,7 @@ void ShowMenu(HWND owner) {
     AppendMenuW(menu, MF_STRING | MF_DISABLED, 0, L"WattPill");
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, ID_REFRESH, T(L"Обновить", L"Refresh"));
+    AppendMenuW(menu, MF_STRING, ID_PANEL, T(L"Открыть панель", L"Open panel"));
     AppendMenuW(menu, MF_STRING | (app.settings.autoStart ? MF_CHECKED : MF_UNCHECKED), ID_AUTOSTART,
                 T(L"Автозагрузка", L"Start with Windows"));
 
@@ -157,7 +166,25 @@ void ShowMenu(HWND owner) {
                 T(L"Над часами", L"Above the clock"));
     AppendMenuW(placement, MF_STRING | (app.settings.pillPlacement == 1 ? MF_CHECKED : 0), ID_PLACE_TASKBAR,
                 T(L"На панели задач", L"On the taskbar"));
+    AppendMenuW(placement, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(placement, MF_STRING | (app.settings.pillUnlocked ? MF_CHECKED : 0), ID_MOVE,
+                T(L"Переместить виджет", L"Move widget"));
+    AppendMenuW(placement, MF_STRING, ID_PLACE_RESET, T(L"Сбросить позицию", L"Reset position"));
     AppendMenuW(menu, MF_POPUP, (UINT_PTR)placement, T(L"Расположение", L"Placement"));
+
+    HMENU style = CreatePopupMenu();
+    AppendMenuW(style, MF_STRING | (app.settings.pillMode == 0 ? MF_CHECKED : 0), ID_MODE_DETAILED,
+                T(L"Подробно: значок, батарея, процент", L"Detailed: icon, battery, percent"));
+    AppendMenuW(style, MF_STRING | (app.settings.pillMode == 1 ? MF_CHECKED : 0), ID_MODE_COMPACT,
+                T(L"Компактно: значок и процент", L"Compact: icon and percent"));
+    AppendMenuW(style, MF_STRING | (app.settings.pillMode == 2 ? MF_CHECKED : 0), ID_MODE_PERCENT,
+                T(L"Только процент", L"Percent only"));
+    AppendMenuW(style, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(style, MF_STRING | (app.settings.pillBackground ? MF_CHECKED : 0), ID_PILL_BG,
+                T(L"Фон пилюли", L"Pill background"));
+    AppendMenuW(menu, MF_POPUP, (UINT_PTR)style, T(L"Вид пилюли", L"Pill style"));
+    AppendMenuW(menu, MF_STRING | (app.settings.hideFullscreen ? MF_CHECKED : 0), ID_HIDE_FULLSCREEN,
+                T(L"Скрывать в полноэкранном режиме", L"Hide in fullscreen"));
 
     HMENU language = CreatePopupMenu();
     AppendMenuW(language, MF_STRING | (app.settings.language == 0 ? MF_CHECKED : 0), ID_LANG_AUTO,
@@ -195,6 +222,10 @@ void HandleCommand(UINT id) {
         SetEvent(app.wakeEvent);
         return;
     }
+    if (id == ID_PANEL) {
+        ui::TogglePanelNow();
+        return;
+    }
     if (id == ID_AUTOSTART) {
         app.settings.autoStart = !app.settings.autoStart;
         EnsureAutostart(app.settings.autoStart);
@@ -203,6 +234,37 @@ void HandleCommand(UINT id) {
     }
     if (id == ID_PLACE_CLOCK || id == ID_PLACE_TASKBAR) {
         app.settings.pillPlacement = id == ID_PLACE_TASKBAR ? 1 : 0;
+        SaveSettingsNow();
+        ui::SetSettings(app.settings);
+        return;
+    }
+    if (id == ID_PLACE_RESET) {
+        app.settings.pillManual = false;
+        app.settings.pillOffset = 12;
+        SaveSettingsNow();
+        ui::SetSettings(app.settings);
+        return;
+    }
+    if (id == ID_MOVE) {
+        app.settings.pillUnlocked = !app.settings.pillUnlocked;
+        SaveSettingsNow();
+        ui::SetSettings(app.settings);
+        return;
+    }
+    if (id == ID_MODE_DETAILED || id == ID_MODE_COMPACT || id == ID_MODE_PERCENT) {
+        app.settings.pillMode = id == ID_MODE_DETAILED ? 0 : id == ID_MODE_COMPACT ? 1 : 2;
+        SaveSettingsNow();
+        ui::SetSettings(app.settings);
+        return;
+    }
+    if (id == ID_PILL_BG) {
+        app.settings.pillBackground = !app.settings.pillBackground;
+        SaveSettingsNow();
+        ui::SetSettings(app.settings);
+        return;
+    }
+    if (id == ID_HIDE_FULLSCREEN) {
+        app.settings.hideFullscreen = !app.settings.hideFullscreen;
         SaveSettingsNow();
         ui::SetSettings(app.settings);
         return;
@@ -248,12 +310,14 @@ void BuildCards(const std::vector<Reading>& fresh, int64_t now) {
             continue;
         }
         state.last.asleep = true;
+        state.last.connected = false;
         state.last.charging = false;
         ++it;
     }
 
     std::vector<ui::Card> cards;
     for (const auto& [id, state] : app.devices) {
+        if (!state.last.connected) continue;   // a device that stopped answering disappears
         ui::Card card;
         card.reading = state.last;
         if (state.last.asleep && !app.settings.dimSleeping) card.reading.asleep = false;
@@ -527,9 +591,11 @@ int Run(int argc, wchar_t** argv) {
 
     ui::Hooks hooks;
     hooks.menu = [] { ShowMenu(app.hwnd); };
+    hooks.refresh = [] { SetEvent(app.wakeEvent); };
+    hooks.settingsChanged = [] { SaveSettingsNow(); };
     ui::Init(app.inst, &app.settings, hooks);
 
-    SetTimer(app.hwnd, TIMER_TICK, 1000, nullptr);
+    SetTimer(app.hwnd, TIMER_TICK, 300, nullptr);
     SetTimer(app.hwnd, TIMER_SAVE, 5 * 60 * 1000, nullptr);
 
     app.thread = CreateThread(nullptr, 0, PollThread, nullptr, 0, nullptr);

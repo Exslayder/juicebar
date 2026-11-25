@@ -13,7 +13,9 @@ struct Card {
 };
 
 struct Hooks {
-    void (*menu)() = nullptr;       // open the tray menu at the cursor
+    void (*menu)() = nullptr;            // open the tray menu at the cursor
+    void (*refresh)() = nullptr;         // poll the devices right now
+    void (*settingsChanged)() = nullptr; // persist a position changed by dragging
 };
 
 bool Init(HINSTANCE inst, Settings* settings, Hooks hooks);
@@ -25,6 +27,7 @@ void SetSettings(const Settings& settings);
 void Tick();               // cheap: z-order, taskbar geometry, auto-hide
 void OnSystemSettingsChanged();
 void ShowPanelNow();       // --panel and the tray menu
+void TogglePanelNow();     // "Open panel" menu item
 
 // Diagnostic: which UI font families were resolved (used by --fonts).
 std::wstring FontReport();

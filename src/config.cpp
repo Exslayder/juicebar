@@ -129,6 +129,12 @@ Settings LoadSettings(const std::wstring& file) {
         else if (key == L"dim_sleeping") s.dimSleeping = ToInt(value, 1) != 0;
         else if (key == L"autostart") s.autoStart = ToInt(value, 1) != 0;
         else if (key == L"pill_placement") s.pillPlacement = ToInt(value, 0);
+        else if (key == L"pill_manual") s.pillManual = ToInt(value, 0) != 0;
+        else if (key == L"pill_offset") s.pillOffset = ToInt(value, 12);
+        else if (key == L"pill_unlocked") s.pillUnlocked = ToInt(value, 0) != 0;
+        else if (key == L"pill_mode") s.pillMode = ToInt(value, 0);
+        else if (key == L"pill_background") s.pillBackground = ToInt(value, 0) != 0;
+        else if (key == L"hide_fullscreen") s.hideFullscreen = ToInt(value, 1) != 0;
         else if (key == L"language") s.language = ToInt(value, 0);
     }
 
@@ -136,6 +142,8 @@ Settings LoadSettings(const std::wstring& file) {
     // The app follows the Windows theme at runtime; only the language is user-selectable.
     s.language = std::clamp(s.language, 0, 2);
     s.pillPlacement = std::clamp(s.pillPlacement, 0, 1);
+    s.pillOffset = std::clamp(s.pillOffset, 0, 4000);
+    s.pillMode = std::clamp(s.pillMode, 0, 2);
     return s;
 }
 
@@ -148,6 +156,12 @@ bool SaveSettings(const std::wstring& file, const Settings& s) {
     text += std::string("dim_sleeping=") + (s.dimSleeping ? "1" : "0") + "\n";
     text += std::string("autostart=") + (s.autoStart ? "1" : "0") + "\n";
     text += "pill_placement=" + std::to_string(std::clamp(s.pillPlacement, 0, 1)) + "\n";
+    text += std::string("pill_manual=") + (s.pillManual ? "1" : "0") + "\n";
+    text += "pill_offset=" + std::to_string(std::clamp(s.pillOffset, 0, 4000)) + "\n";
+    text += std::string("pill_unlocked=") + (s.pillUnlocked ? "1" : "0") + "\n";
+    text += "pill_mode=" + std::to_string(std::clamp(s.pillMode, 0, 2)) + "\n";
+    text += std::string("pill_background=") + (s.pillBackground ? "1" : "0") + "\n";
+    text += std::string("hide_fullscreen=") + (s.hideFullscreen ? "1" : "0") + "\n";
     text += "language=" + std::to_string(s.language) + "\n";
 
     const std::wstring tmp = file + L".tmp";
@@ -178,6 +192,39 @@ bool TaskbarIsLight() {
         light = value != 0;
     RegCloseKey(key);
     return light;
+}
+
+bool AppIsLight() {
+    HKEY key = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+                      0, KEY_READ, &key) != ERROR_SUCCESS)
+        return true;
+    DWORD value = 1, size = sizeof(value), type = 0;
+    bool light = true;
+    if (RegQueryValueExW(key, L"AppsUseLightTheme", nullptr, &type, (LPBYTE)&value, &size) == ERROR_SUCCESS &&
+        type == REG_DWORD)
+        light = value != 0;
+    RegCloseKey(key);
+    return light;
+}
+
+COLORREF SystemAccentColor(bool light) {
+    HKEY key = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\DWM", 0, KEY_READ, &key) ==
+        ERROR_SUCCESS) {
+        BYTE palette[32] = {};
+        DWORD size = sizeof(palette), type = 0;
+        if (RegQueryValueExW(key, L"AccentPalette", nullptr, &type, palette, &size) == ERROR_SUCCESS &&
+            type == REG_BINARY && size >= 24) {
+            const int offset = light ? 16 : 4;
+            const COLORREF color = RGB(palette[offset], palette[offset + 1], palette[offset + 2]);
+            RegCloseKey(key);
+            return color;
+        }
+        RegCloseKey(key);
+    }
+    // Windows 11 defaults: dark blue on light, light blue on dark.
+    return light ? RGB(0x00, 0x5F, 0xB8) : RGB(0x60, 0xCD, 0xFF);
 }
 
 } // namespace ch
