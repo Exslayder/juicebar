@@ -66,17 +66,18 @@ DPI from 100 % to 200 % is handled by scaling every metric from the system DPI.
 
 ## Settings
 
-Right-click the pill opens a short native menu: *Open panel*, *Refresh*, *Settings*, *Exit*. The
-menu is dark or light with the Windows app theme.
+Left-click the pill opens the device panel; **right-click opens Settings** directly.
 
-*Settings* opens a second panel with the same 440 DIP card, 20 px radius, Inter typography and
-neutral surfaces as the device list:
+The settings panel has the same 440 DIP card, 20 px radius, Inter typography and neutral surfaces as
+the device list:
 
-- a small **Настройки** title and one rounded card;
-- one row per option, separated by a hairline;
+- a compact header with the **WattPill** wordmark (20 px bold display face) on the left and a small
+  *Настройки* caption on the right;
+- one rounded card with a row per option, separated by a hairline;
 - **toggle switches** for Start with Windows, Move widget, Pill background and Hide in fullscreen;
 - **segmented buttons** for Placement, Pill style, Monitor and Language;
-- a **Reset position** action row.
+- a **Reset position** action row;
+- two buttons at the bottom: **Refresh** (accent) and **Exit** (red).
 
 There is no Save button: every change is applied and persisted immediately. The panel closes when
 the pointer leaves it, so it never sits in the way.

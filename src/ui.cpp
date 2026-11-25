@@ -66,7 +66,9 @@ struct Fonts {
     std::unique_ptr<FontFamily> fallbackSemi;
     std::unique_ptr<FontFamily> iconFamily;
     std::unique_ptr<FontFamily> pillFamily;
+    std::unique_ptr<FontFamily> displayFamily;
     std::unique_ptr<Font> name, small, status, percent;
+    std::unique_ptr<Font> wordmark;
     std::unique_ptr<Font> pillPct, pillGlyph, pillBolt;
 
     void Build(float scale, bool hasUi, FontFamily* regular, FontFamily* medium, FontFamily* semibold) {
@@ -92,6 +94,10 @@ struct Fonts {
         make(status, 2, 13.5f);
         make(small, 0, 12.0f);
         make(percent, 2, 19.0f);
+
+        displayFamily = std::make_unique<FontFamily>(L"Segoe UI Variable Display");
+        if (displayFamily->GetLastStatus() != Ok) displayFamily = std::make_unique<FontFamily>(L"Segoe UI");
+        wordmark = std::make_unique<Font>(displayFamily.get(), 20.0f * scale, FontStyleBold, UnitPixel);
 
         pillFamily = std::make_unique<FontFamily>(L"Segoe UI Semibold");
         if (pillFamily->GetLastStatus() != Ok) pillFamily = std::make_unique<FontFamily>(L"Segoe UI");
@@ -182,6 +188,8 @@ enum SettingId {
     kSetMonitor,
     kSetLanguage,
     kSetReset,
+    kSetRefresh,
+    kSetExit,
 };
 
 struct SettingHit {
@@ -1038,6 +1046,12 @@ std::vector<std::wstring> MonitorLabels() {
 
 void ApplySettingHit(const SettingHit& hit) {
     switch (hit.id) {
+        case kSetRefresh:
+            if (g.hooks.refresh) g.hooks.refresh();
+            return;
+        case kSetExit:
+            if (g.hooks.exit) g.hooks.exit();
+            return;
         case kSetAutostart: g.settings->autoStart = !g.settings->autoStart; break;
         case kSetMove: g.settings->pillUnlocked = !g.settings->pillUnlocked; break;
         case kSetBackground: g.settings->pillBackground = !g.settings->pillBackground; break;
@@ -1064,11 +1078,9 @@ void RenderSettings() {
     if (!g.panel) return;
     const int pad = (int)std::lround(16 * g.scale);
     const int width = (int)std::lround(440 * g.scale);
-    const int titleH = (int)std::lround(26 * g.scale);
-    const int titleGap = (int)std::lround(8 * g.scale);
-    const int rowH = (int)std::lround(46 * g.scale);
+    const int headerH = (int)std::lround(48 * g.scale);
     const int cardX = pad;
-    const int cardY = pad + titleH + titleGap;
+    const int cardY = pad + headerH + (int)std::lround(4 * g.scale);
     const int cardW = width - pad * 2;
     const int radius = (int)std::lround(20 * g.scale);
 
@@ -1079,16 +1091,24 @@ void RenderSettings() {
     rows.push_back(kSetLanguage);
     rows.push_back(kSetReset);
 
+    const int rowH = (int)std::lround(46 * g.scale);
     const int cardH = (int)rows.size() * rowH + (int)(rows.size() - 1);
-    const int height = cardY + cardH + pad;
+    const int buttonH = (int)std::lround(38 * g.scale);
+    const int buttonGap = (int)std::lround(10 * g.scale);
+    const int buttonsY = cardY + cardH + (int)std::lround(12 * g.scale);
+    const int height = buttonsY + buttonH + pad;
 
     Canvas canvas(width, height);
     Graphics& g2 = *canvas.g;
     FillRound(g2, RectF(0, 0, (float)width, (float)height), (float)radius, g.theme.bg);
     StrokeRound(g2, RectF(0.5f, 0.5f, width - 1.0f, height - 1.0f), (float)radius, g.theme.border, 1.0f);
 
-    Text(g2, Tr(L"Настройки", L"Settings"), g.fonts.name.get(),
-         RectF((float)pad, (float)pad, (float)(cardW), (float)titleH), g.theme.text, StringAlignmentNear);
+    Text(g2, L"WattPill", g.fonts.wordmark.get(),
+         RectF((float)pad, (float)pad - 2 * g.scale, 240 * g.scale, 32 * g.scale),
+         g.theme.text, StringAlignmentNear);
+    Text(g2, Tr(L"Настройки", L"Settings"), g.fonts.small.get(),
+         RectF((float)(width - pad) - 170 * g.scale, (float)pad + 2 * g.scale, 170 * g.scale, 24 * g.scale),
+         g.theme.sub, StringAlignmentFar);
 
     FillRound(g2, RectF((float)cardX, (float)cardY, (float)cardW, (float)cardH), 16 * g.scale, g.theme.card);
     g.settingHits.clear();
@@ -1171,6 +1191,25 @@ void RenderSettings() {
             SolidBrush line(WithAlpha(g.theme.text, 14));
             g2.FillRectangle(&line, RectF(row.X + 16 * g.scale, lineY, row.Width - 32 * g.scale, 1.0f));
         }
+    }
+
+    const float buttonW = (cardW - buttonGap) / 2.0f;
+    const RectF refreshBtn((float)cardX, (float)buttonsY, buttonW, (float)buttonH);
+    const RectF exitBtn((float)(cardX + buttonW + buttonGap), (float)buttonsY, buttonW, (float)buttonH);
+    for (int b = 0; b < 2; b++) {
+        const RectF rect = b == 0 ? refreshBtn : exitBtn;
+        const Color color = b == 0 ? g.theme.accent : g.theme.red;
+        const size_t hitIndex = g.settingHits.size();
+        g.settingHits.push_back({ b == 0 ? kSetRefresh : kSetExit, -1, rect });
+        const bool hovered = g.hoveredSetting == (int)hitIndex;
+        FillRound(g2, rect, 10 * g.scale, g.theme.card);
+        if (hovered)
+            FillRound(g2, RectF(rect.X + 1, rect.Y + 1, rect.Width - 2, rect.Height - 2),
+                      9 * g.scale, WithAlpha(color, 22));
+        StrokeRound(g2, RectF(rect.X + 0.5f, rect.Y + 0.5f, rect.Width - 1.0f, rect.Height - 1.0f),
+                    10 * g.scale, WithAlpha(color, hovered ? 110 : 55), 1.0f);
+        Text(g2, b == 0 ? Tr(L"Обновить", L"Refresh") : Tr(L"Выход", L"Exit"),
+             g.fonts.status.get(), rect, color, StringAlignmentCenter);
     }
 
     PlaceAndPresentPanel(canvas, width, height);
@@ -1583,7 +1622,9 @@ LRESULT CALLBACK PillProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             if (g.visible && g.panel) SetTimer(g.panel, kPanelTimerHide, 200, nullptr);
             return 0;
         case WM_RBUTTONUP:
-            if (g.hooks.menu) g.hooks.menu();
+            HideTip();
+            KillTimer(h, kPillTipTimer);
+            ShowPanelInternal(PanelMode::Settings);
             return 0;
         case WM_APP_REFRESH_UI:
         case WM_DISPLAYCHANGE:

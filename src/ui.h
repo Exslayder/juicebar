@@ -13,10 +13,10 @@ struct Card {
 };
 
 struct Hooks {
-    void (*menu)() = nullptr;            // open the tray menu at the cursor
     void (*refresh)() = nullptr;         // poll the devices right now
     void (*settingsChanged)() = nullptr; // persist a position changed by dragging
     void (*settingsApplied)() = nullptr; // apply + save a toggle from the settings panel
+    void (*exit)() = nullptr;            // close WattPill from the settings panel
 };
 
 bool Init(HINSTANCE inst, Settings* settings, Hooks hooks);

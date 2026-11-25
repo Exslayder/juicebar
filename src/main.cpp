@@ -155,22 +155,6 @@ void RemoveLegacyAutostart() {
 
 // ---------------------------------------------------------------- menu
 
-void ShowMenu(HWND owner) {
-    HMENU menu = CreatePopupMenu();
-    AppendMenuW(menu, MF_STRING, ID_PANEL, T(L"Открыть панель", L"Open panel"));
-    AppendMenuW(menu, MF_STRING, ID_REFRESH, T(L"Обновить", L"Refresh"));
-    AppendMenuW(menu, MF_STRING, ID_SETTINGS, T(L"Настройки", L"Settings"));
-    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(menu, MF_STRING, ID_QUIT, T(L"Выход", L"Exit"));
-
-    POINT p{};
-    GetCursorPos(&p);
-    SetForegroundWindow(owner);
-    TrackPopupMenu(menu, TPM_RIGHTALIGN | TPM_BOTTOMALIGN | TPM_LEFTBUTTON, p.x, p.y, 0, owner, nullptr);
-    PostMessageW(owner, WM_NULL, 0, 0);
-    DestroyMenu(menu);
-}
-
 void SaveSettingsNow() {
     Settings saved = app.settings;
     if (app.options.noPill) saved.showPill = app.savedShowPill;   // a run-time switch, not a setting
@@ -593,7 +577,6 @@ int Run(int argc, wchar_t** argv) {
     SetPollWake(WakePoll);
 
     ui::Hooks hooks;
-    hooks.menu = [] { ShowMenu(app.hwnd); };
     hooks.refresh = [] { SetEvent(app.wakeEvent); };
     hooks.settingsChanged = [] { SaveSettingsNow(); };
     hooks.settingsApplied = [] {
@@ -602,6 +585,7 @@ int Run(int argc, wchar_t** argv) {
         SaveSettingsNow();
         ui::SetSettings(app.settings);
     };
+    hooks.exit = [] { PostMessageW(app.hwnd, WM_CLOSE, 0, 0); };
     ui::Init(app.inst, &app.settings, hooks);
 
     SetTimer(app.hwnd, TIMER_TICK, 300, nullptr);
