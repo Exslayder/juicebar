@@ -1433,6 +1433,31 @@ bool ForegroundCoversMonitor(HMONITOR target) {
            window.right >= screen.right - 1 && window.bottom >= screen.bottom - 1;
 }
 
+bool ProcessNameIs(HWND hwnd, const wchar_t* name) {
+    DWORD pid = 0;
+    GetWindowThreadProcessId(hwnd, &pid);
+    if (!pid) return false;
+    HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (!process) return false;
+    wchar_t path[MAX_PATH] = {};
+    DWORD size = (DWORD)(sizeof(path) / sizeof(path[0]));
+    const bool ok = QueryFullProcessImageNameW(process, 0, path, &size) != FALSE;
+    CloseHandle(process);
+    if (!ok) return false;
+    const wchar_t* base = wcsrchr(path, L'\\');
+    base = base ? base + 1 : path;
+    return !_wcsicmp(base, name);
+}
+
+// The Start menu (Win key) is a shell surface, but it means the user is back at the taskbar:
+// the pill should be visible while it is open, even if a fullscreen game is still running.
+bool StartMenuOpen() {
+    HWND foreground = GetForegroundWindow();
+    return foreground && (ProcessNameIs(foreground, L"StartMenuExperienceHost.exe") ||
+                          ProcessNameIs(foreground, L"SearchHost.exe") ||
+                          ProcessNameIs(foreground, L"ShellHost.exe"));
+}
+
 bool FullscreenApp() {
     if (!g.settings) return false;
     const HMONITOR target = MonitorAt(g.settings->monitorIndex);
@@ -1440,8 +1465,10 @@ bool FullscreenApp() {
 
     // Shell overlays (Alt+Tab / Task View) briefly take the foreground while a game is still
     // fullscreen. Do not treat that as "fullscreen ended": keep the pill hidden until a real
-    // window or the desktop/taskbar takes over.
+    // window or the desktop/taskbar takes over. The Start menu is the exception: the user is
+    // explicitly at the taskbar, so show the pill again.
     if (g.fullscreen) {
+        if (StartMenuOpen()) return false;
         HWND fg = GetForegroundWindow();
         if (fg) {
             wchar_t cls[128] = {};
