@@ -170,11 +170,30 @@ struct IconStore {
     }
 };
 
+enum class PanelMode { Devices, Settings };
+
+enum SettingId {
+    kSetAutostart = 1,
+    kSetMove,
+    kSetBackground,
+    kSetFullscreen,
+    kSetPlacement,
+    kSetStyle,
+    kSetMonitor,
+    kSetLanguage,
+    kSetReset,
+};
+
+struct SettingHit {
+    int id = 0;
+    int option = 0;
+    RectF rect;
+};
+
 struct State {
     HINSTANCE inst = nullptr;
     Settings* settings = nullptr;
     Hooks hooks;
-
     HWND pill = nullptr;
     HWND panel = nullptr;
 
@@ -184,6 +203,9 @@ struct State {
     bool visible = false;
 
     int hoveredCard = -1;
+    PanelMode panelMode = PanelMode::Devices;
+    std::vector<SettingHit> settingHits;
+    int hoveredSetting = -1;
 
     float scale = 1.0f;
     Theme theme;
@@ -884,43 +906,7 @@ void DrawCard(Graphics& g2, const Card& card, RectF box) {
          WithAlpha(PercentColor(card), textAlpha), StringAlignmentFar);
 }
 
-void RenderPanel() {
-    if (!g.panel) return;
-    const int pad = (int)std::lround(16 * g.scale);
-    const int width = (int)std::lround(440 * g.scale);
-    const int count = (int)g.cards.size();
-    const int height = MeasurePanelHeight(count);
-    const int cardH = (int)std::lround(80 * g.scale);
-    const int cardGap = (int)std::lround(10 * g.scale);
-    const int radius = (int)std::lround(20 * g.scale);
-
-    Canvas canvas(width, height);
-    Graphics& g2 = *canvas.g;
-
-    FillRound(g2, RectF(0, 0, (float)width, (float)height), (float)radius, g.theme.bg);
-    StrokeRound(g2, RectF(0.5f, 0.5f, width - 1.0f, height - 1.0f), (float)radius, g.theme.border, 1.0f);
-
-    // ---- cards
-    g.cardRects.clear();
-    float y = (float)pad;
-    if (count == 0) {
-        RectF box((float)pad, y, (float)(width - pad * 2), 84 * g.scale);
-        FillRound(g2, box, 16 * g.scale, g.theme.card);
-        Text(g2, Tr(L"Нет устройств с батареей", L"No battery devices"), g.fonts.status.get(),
-             RectF(box.X, box.Y + 20 * g.scale, box.Width, 20 * g.scale), g.theme.sub, StringAlignmentCenter);
-        Text(g2, Tr(L"Включите мышь, наушники или подключите донгл", L"Turn on your mouse, headset or receiver"),
-             g.fonts.small.get(), RectF(box.X + 10 * g.scale, box.Y + 44 * g.scale, box.Width - 20 * g.scale, 18 * g.scale),
-             g.theme.faint, StringAlignmentCenter, true);
-    } else {
-        for (int i = 0; i < count; i++) {
-            RectF box((float)pad, y, (float)(width - pad * 2), (float)cardH);
-            g.cardRects.push_back(box);
-            DrawCard(g2, g.cards[(size_t)i], box);
-            y += cardH + cardGap;
-        }
-    }
-
-    // ---- anchor above the widget / taskbar
+void PlaceAndPresentPanel(Canvas& canvas, int width, int height) {
     const BarLayout layout = BarForMonitor(MonitorAt(g.settings->monitorIndex));
     const RECT bar = layout.bar;
     RECT work = layout.work;
@@ -956,6 +942,238 @@ void RenderPanel() {
     const int visualY = panelY + (belowTaskbar ? -slide : slide);
     g.panelPos = { panelX, visualY };
     canvas.Present(g.panel, panelX, visualY, (BYTE)std::lround(255 * std::clamp(g.reveal, 0.0f, 1.0f)));
+}
+
+void RenderSettings();
+
+void RenderPanel() {
+    if (!g.panel) return;
+    if (g.panelMode == PanelMode::Settings) {
+        RenderSettings();
+        return;
+    }
+    const int pad = (int)std::lround(16 * g.scale);
+    const int width = (int)std::lround(440 * g.scale);
+    const int count = (int)g.cards.size();
+    const int height = MeasurePanelHeight(count);
+    const int cardH = (int)std::lround(80 * g.scale);
+    const int cardGap = (int)std::lround(10 * g.scale);
+    const int radius = (int)std::lround(20 * g.scale);
+
+    Canvas canvas(width, height);
+    Graphics& g2 = *canvas.g;
+
+    FillRound(g2, RectF(0, 0, (float)width, (float)height), (float)radius, g.theme.bg);
+    StrokeRound(g2, RectF(0.5f, 0.5f, width - 1.0f, height - 1.0f), (float)radius, g.theme.border, 1.0f);
+
+    // ---- cards
+    g.cardRects.clear();
+    float y = (float)pad;
+    if (count == 0) {
+        RectF box((float)pad, y, (float)(width - pad * 2), 84 * g.scale);
+        FillRound(g2, box, 16 * g.scale, g.theme.card);
+        Text(g2, Tr(L"Нет устройств с батареей", L"No battery devices"), g.fonts.status.get(),
+             RectF(box.X, box.Y + 20 * g.scale, box.Width, 20 * g.scale), g.theme.sub, StringAlignmentCenter);
+        Text(g2, Tr(L"Включите мышь, наушники или подключите донгл", L"Turn on your mouse, headset or receiver"),
+             g.fonts.small.get(), RectF(box.X + 10 * g.scale, box.Y + 44 * g.scale, box.Width - 20 * g.scale, 18 * g.scale),
+             g.theme.faint, StringAlignmentCenter, true);
+    } else {
+        for (int i = 0; i < count; i++) {
+            RectF box((float)pad, y, (float)(width - pad * 2), (float)cardH);
+            g.cardRects.push_back(box);
+            DrawCard(g2, g.cards[(size_t)i], box);
+            y += cardH + cardGap;
+        }
+    }
+
+    // ---- anchor above the widget / taskbar
+    PlaceAndPresentPanel(canvas, width, height);
+}
+
+// ------------------------------------------------------------------ drawing: settings panel
+
+void DrawToggle(Graphics& g2, RectF track, bool on, bool hovered) {
+    const float radius = track.Height / 2;
+    const Color off = WithAlpha(g.theme.text, hovered ? 54 : 34);
+    FillRound(g2, track, radius, on ? g.theme.accent : off);
+    const float knob = track.Height - 6 * g.scale;
+    const float x = on ? track.GetRight() - 3 * g.scale - knob : track.X + 3 * g.scale;
+    SolidBrush brush(Color(255, 255, 255, 255));
+    g2.FillEllipse(&brush, x, track.Y + 3 * g.scale, knob, knob);
+}
+
+void DrawSegments(Graphics& g2, RectF box, const std::vector<std::wstring>& labels, int selected, int id) {
+    FillRound(g2, box, 8 * g.scale, WithAlpha(g.theme.text, 16));
+    const float segW = box.Width / std::max<size_t>(1, labels.size());
+    for (size_t i = 0; i < labels.size(); i++) {
+        RectF inner(box.X + segW * (float)i + 2 * g.scale, box.Y + 2 * g.scale,
+                    segW - 4 * g.scale, box.Height - 4 * g.scale);
+        const size_t hitIndex = g.settingHits.size();
+        g.settingHits.push_back({ id, (int)i, RectF(box.X + segW * (float)i, box.Y, segW, box.Height) });
+        const bool hovered = g.hoveredSetting == (int)hitIndex;
+        if ((int)i == selected)
+            FillRound(g2, inner, 6 * g.scale, g.theme.accent);
+        else if (hovered)
+            FillRound(g2, inner, 6 * g.scale, WithAlpha(g.theme.text, 12));
+        Text(g2, labels[i], g.fonts.small.get(), inner,
+             (int)i == selected ? Color(255, 255, 255, 255) : g.theme.sub, StringAlignmentCenter);
+    }
+}
+
+std::vector<std::wstring> MonitorLabels() {
+    std::vector<std::wstring> labels;
+    const auto monitors = Monitors();
+    int extra = 0;
+    for (size_t i = 0; i < monitors.size() && i < 3; i++) {
+        if (monitors[i].primary) {
+            labels.push_back(Tr(L"Основной", L"Primary"));
+        } else {
+            ++extra;
+            labels.push_back(extra == 1 ? Tr(L"Дополнительный", L"Additional")
+                                        : Fmt(L"%s %d", Tr(L"Дополнительный", L"Additional"), extra));
+        }
+    }
+    return labels;
+}
+
+void ApplySettingHit(const SettingHit& hit) {
+    switch (hit.id) {
+        case kSetAutostart: g.settings->autoStart = !g.settings->autoStart; break;
+        case kSetMove: g.settings->pillUnlocked = !g.settings->pillUnlocked; break;
+        case kSetBackground: g.settings->pillBackground = !g.settings->pillBackground; break;
+        case kSetFullscreen: g.settings->hideFullscreen = !g.settings->hideFullscreen; break;
+        case kSetPlacement:
+            g.settings->pillPlacement = std::clamp(hit.option, 0, 1);
+            g.settings->pillFree = false;
+            break;
+        case kSetStyle: g.settings->pillMode = std::clamp(hit.option, 0, 2); break;
+        case kSetMonitor: g.settings->monitorIndex = std::clamp(hit.option, 0, 15); break;
+        case kSetLanguage: g.settings->language = std::clamp(hit.option, 0, 2); break;
+        case kSetReset:
+            g.settings->pillFree = false;
+            g.settings->pillManual = false;
+            g.settings->pillOffset = 12;
+            break;
+        default: return;
+    }
+    if (g.hooks.settingsApplied) g.hooks.settingsApplied();
+    RenderPanel();
+}
+
+void RenderSettings() {
+    if (!g.panel) return;
+    const int pad = (int)std::lround(16 * g.scale);
+    const int width = (int)std::lround(440 * g.scale);
+    const int titleH = (int)std::lround(26 * g.scale);
+    const int titleGap = (int)std::lround(8 * g.scale);
+    const int rowH = (int)std::lround(46 * g.scale);
+    const int cardX = pad;
+    const int cardY = pad + titleH + titleGap;
+    const int cardW = width - pad * 2;
+    const int radius = (int)std::lround(20 * g.scale);
+
+    const auto monitors = Monitors();
+    std::vector<int> rows = { kSetAutostart, kSetMove, kSetBackground, kSetFullscreen,
+                              kSetPlacement, kSetStyle };
+    if (monitors.size() > 1) rows.push_back(kSetMonitor);
+    rows.push_back(kSetLanguage);
+    rows.push_back(kSetReset);
+
+    const int cardH = (int)rows.size() * rowH + (int)(rows.size() - 1);
+    const int height = cardY + cardH + pad;
+
+    Canvas canvas(width, height);
+    Graphics& g2 = *canvas.g;
+    FillRound(g2, RectF(0, 0, (float)width, (float)height), (float)radius, g.theme.bg);
+    StrokeRound(g2, RectF(0.5f, 0.5f, width - 1.0f, height - 1.0f), (float)radius, g.theme.border, 1.0f);
+
+    Text(g2, Tr(L"Настройки", L"Settings"), g.fonts.name.get(),
+         RectF((float)pad, (float)pad, (float)(cardW), (float)titleH), g.theme.text, StringAlignmentNear);
+
+    FillRound(g2, RectF((float)cardX, (float)cardY, (float)cardW, (float)cardH), 16 * g.scale, g.theme.card);
+    g.settingHits.clear();
+
+    const auto labels = MonitorLabels();
+    float y = (float)cardY;
+    for (size_t r = 0; r < rows.size(); r++) {
+        const int id = rows[r];
+        const RectF row((float)cardX, y, (float)cardW, (float)rowH);
+        const float labelX = row.X + 16 * g.scale;
+        const float right = row.GetRight() - 16 * g.scale;
+        const std::wstring label =
+            id == kSetAutostart ? Tr(L"Автозагрузка", L"Start with Windows")
+            : id == kSetMove ? Tr(L"Перемещать виджет", L"Move widget")
+            : id == kSetBackground ? Tr(L"Фон пилюли", L"Pill background")
+            : id == kSetFullscreen ? Tr(L"Скрывать в полноэкранном режиме", L"Hide in fullscreen")
+            : id == kSetPlacement ? Tr(L"Расположение", L"Placement")
+            : id == kSetStyle ? Tr(L"Вид пилюли", L"Pill style")
+            : id == kSetMonitor ? Tr(L"Монитор", L"Monitor")
+            : id == kSetLanguage ? Tr(L"Язык", L"Language")
+            : Tr(L"Сбросить позицию", L"Reset position");
+
+        const bool isReset = id == kSetReset;
+        float reserve = 0;
+        if (id == kSetAutostart || id == kSetMove || id == kSetBackground || id == kSetFullscreen)
+            reserve = 64 * g.scale;
+        else if (id == kSetPlacement) reserve = 172 * g.scale;
+        else if (id == kSetStyle) reserve = 222 * g.scale;
+        else if (id == kSetMonitor) reserve = 240 * g.scale;
+        else if (id == kSetLanguage) reserve = 172 * g.scale;
+        const float labelW = std::max(40 * g.scale, right - labelX - reserve - 6 * g.scale);
+        Text(g2, label, g.fonts.status.get(),
+             RectF(labelX, row.Y, labelW, row.Height),
+             isReset ? g.theme.accent : g.theme.text, StringAlignmentNear, true);
+
+        if (id == kSetAutostart || id == kSetMove || id == kSetBackground || id == kSetFullscreen) {
+            const float trackW = 40 * g.scale, trackH = 22 * g.scale;
+            const RectF track(right - trackW, row.Y + (row.Height - trackH) / 2, trackW, trackH);
+            const bool on = id == kSetAutostart ? g.settings->autoStart
+                          : id == kSetMove ? g.settings->pillUnlocked
+                          : id == kSetBackground ? g.settings->pillBackground
+                                                 : g.settings->hideFullscreen;
+            const size_t hitIndex = g.settingHits.size();
+            g.settingHits.push_back({ id, -1, row });
+            DrawToggle(g2, track, on, g.hoveredSetting == (int)hitIndex);
+        } else if (id == kSetPlacement) {
+            const std::vector<std::wstring> seg = { Tr(L"Над часами", L"Above clock"),
+                                                    Tr(L"На панели", L"Taskbar") };
+            const float segW = 160 * g.scale, segH = 28 * g.scale;
+            DrawSegments(g2, RectF(right - segW, row.Y + (row.Height - segH) / 2, segW, segH), seg,
+                         g.settings->pillPlacement, id);
+        } else if (id == kSetStyle) {
+            const std::vector<std::wstring> seg = { Tr(L"Подробно", L"Detailed"),
+                                                    Tr(L"Компактно", L"Compact"),
+                                                    Tr(L"Процент", L"Percent") };
+            const float segW = 210 * g.scale, segH = 28 * g.scale;
+            DrawSegments(g2, RectF(right - segW, row.Y + (row.Height - segH) / 2, segW, segH), seg,
+                         g.settings->pillMode, id);
+        } else if (id == kSetMonitor) {
+            const float segW = 230 * g.scale, segH = 28 * g.scale;
+            DrawSegments(g2, RectF(right - segW, row.Y + (row.Height - segH) / 2, segW, segH), labels,
+                         std::clamp(g.settings->monitorIndex, 0, (int)labels.size() - 1), id);
+        } else if (id == kSetLanguage) {
+            const std::vector<std::wstring> seg = { Tr(L"Авто", L"Auto"), L"Рус", L"Eng" };
+            const float segW = 160 * g.scale, segH = 28 * g.scale;
+            DrawSegments(g2, RectF(right - segW, row.Y + (row.Height - segH) / 2, segW, segH), seg,
+                         g.settings->language, id);
+        } else if (isReset) {
+            const size_t hitIndex = g.settingHits.size();
+            g.settingHits.push_back({ id, -1, row });
+            if (g.hoveredSetting == (int)hitIndex)
+                FillRound(g2, RectF(row.X + 4 * g.scale, row.Y + 3 * g.scale,
+                                    row.Width - 8 * g.scale, row.Height - 6 * g.scale),
+                          10 * g.scale, WithAlpha(g.theme.text, 12));
+        }
+
+        y += rowH;
+        if (r + 1 < rows.size()) {
+            const float lineY = y;
+            SolidBrush line(WithAlpha(g.theme.text, 14));
+            g2.FillRectangle(&line, RectF(row.X + 16 * g.scale, lineY, row.Width - 32 * g.scale, 1.0f));
+        }
+    }
+
+    PlaceAndPresentPanel(canvas, width, height);
 }
 
 // ------------------------------------------------------------------ theme & windows
@@ -1043,12 +1261,15 @@ void RebuildFonts() {
     g.fonts.Build(g.scale, g.uiFontVariable, g.familyRegular, g.familyMedium, g.familySemibold);
 }
 
-void ShowPanelInternal() {
+void ShowPanelInternal(PanelMode mode) {
+    g.panelMode = mode;
     g.visible = true;
     if (!g.panel) return;
     HideTip();
     if (!g.reveal) g.reveal = 0.0f;
     g.animLast = 0;
+    g.hoveredCard = -1;
+    g.hoveredSetting = -1;
     RenderPanel();
     ShowWindow(g.panel, SW_SHOWNOACTIVATE);
     SetWindowPos(g.panel, HWND_TOPMOST, g.panelPos.x, g.panelPos.y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
@@ -1059,6 +1280,7 @@ void HidePanelInternal() {
 
     g.visible = false;
     g.hoveredCard = -1;
+    g.hoveredSetting = -1;
     if (!g.panel) return;
     KillTimer(g.panel, kPanelTimerHide);
     KillTimer(g.panel, kPanelTimerAnim);
@@ -1329,8 +1551,12 @@ LRESULT CALLBACK PillProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             const ULONGLONG now = GetTickCount64();
             if (now - lastToggle < 300) return 0;
             lastToggle = now;
-            if (g.visible) HidePanelInternal();
-            else ShowPanelInternal();
+            if (g.visible) {
+                if (g.panelMode == PanelMode::Settings) ShowPanelInternal(PanelMode::Devices);
+                else HidePanelInternal();
+            } else {
+                ShowPanelInternal(PanelMode::Devices);
+            }
             return 0;
         }
         case WM_CAPTURECHANGED:
@@ -1381,6 +1607,20 @@ LRESULT CALLBACK PanelProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             KillTimer(h, kPanelTimerHide);
             TrackLeave(h);
             POINT p{ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) };
+            if (g.panelMode == PanelMode::Settings) {
+                int hit = -1;
+                for (size_t i = 0; i < g.settingHits.size(); i++) {
+                    if (g.settingHits[i].rect.Contains((float)p.x, (float)p.y)) {
+                        hit = (int)i;
+                        break;
+                    }
+                }
+                if (hit != g.hoveredSetting) {
+                    g.hoveredSetting = hit;
+                    RenderPanel();
+                }
+                return 0;
+            }
             int cardIndex = -1;
             for (size_t i = 0; i < g.cardRects.size(); i++) {
                 if (g.cardRects[i].Contains((float)p.x, (float)p.y)) {
@@ -1396,6 +1636,7 @@ LRESULT CALLBACK PanelProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         }
         case WM_MOUSELEAVE:
             g.hoveredCard = -1;
+            g.hoveredSetting = -1;
             SetTimer(h, kPanelTimerHide, 200, nullptr);
             RenderPanel();
             return 0;
@@ -1413,6 +1654,15 @@ LRESULT CALLBACK PanelProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             }
             return 0;
         case WM_LBUTTONUP:
+            if (g.panelMode == PanelMode::Settings) {
+                const POINT p{ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) };
+                for (const auto& hit : g.settingHits) {
+                    if (hit.rect.Contains((float)p.x, (float)p.y)) {
+                        ApplySettingHit(hit);
+                        break;
+                    }
+                }
+            }
             return 0;
         case WM_APP_REFRESH_UI:
         case WM_DISPLAYCHANGE:
@@ -1695,8 +1945,9 @@ void OnSystemSettingsChanged() {
     if (g.panel && g.visible) RenderPanel();
 }
 
-void ShowPanelNow() { ShowPanelInternal(); }
-void TogglePanelNow() { if (g.visible) HidePanelInternal(); else ShowPanelInternal(); }
+void ShowPanelNow() { ShowPanelInternal(PanelMode::Devices); }
+void ShowSettingsNow() { ShowPanelInternal(PanelMode::Settings); }
+void TogglePanelNow() { if (g.visible) HidePanelInternal(); else ShowPanelInternal(PanelMode::Devices); }
 
 std::wstring FontReport() {
     using namespace Gdiplus;

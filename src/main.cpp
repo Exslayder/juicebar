@@ -41,6 +41,7 @@ constexpr UINT_PTR TIMER_SAVE = 2;
 enum MenuId : UINT {
     ID_REFRESH = 100,
     ID_PANEL = 130,
+    ID_SETTINGS = 131,
     ID_AUTOSTART = 150,
     ID_QUIT = 160,
     ID_PLACE_CLOCK = 170,
@@ -154,100 +155,11 @@ void RemoveLegacyAutostart() {
 
 // ---------------------------------------------------------------- menu
 
-struct MonitorLite {
-    RECT rect{};
-    bool primary = false;
-};
-
-std::vector<MonitorLite> ListMonitors() {
-    std::vector<MonitorLite> monitors;
-    EnumDisplayMonitors(nullptr, nullptr,
-                        [](HMONITOR mon, HDC, LPRECT, LPARAM data) -> BOOL {
-                            auto* out = reinterpret_cast<std::vector<MonitorLite>*>(data);
-                            MONITORINFO mi{ sizeof(mi) };
-                            if (GetMonitorInfoW(mon, &mi)) {
-                                MonitorLite entry;
-                                entry.rect = mi.rcMonitor;
-                                entry.primary = (mi.dwFlags & MONITORINFOF_PRIMARY) != 0;
-                                out->push_back(entry);
-                            }
-                            return TRUE;
-                        },
-                        (LPARAM)&monitors);
-    std::stable_sort(monitors.begin(), monitors.end(), [](const MonitorLite& a, const MonitorLite& b) {
-        if (a.primary != b.primary) return a.primary;
-        if (a.rect.left != b.rect.left) return a.rect.left < b.rect.left;
-        return a.rect.top < b.rect.top;
-    });
-    return monitors;
-}
-
 void ShowMenu(HWND owner) {
     HMENU menu = CreatePopupMenu();
-    AppendMenuW(menu, MF_STRING | MF_DISABLED, 0, L"WattPill");
-    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(menu, MF_STRING, ID_PANEL, T(L"Открыть панель", L"Open panel"));
     AppendMenuW(menu, MF_STRING, ID_REFRESH, T(L"Обновить", L"Refresh"));
-    AppendMenuW(menu, MF_STRING | (app.settings.autoStart ? MF_CHECKED : MF_UNCHECKED), ID_AUTOSTART,
-                T(L"Автозагрузка", L"Start with Windows"));
-
-    HMENU placement = CreatePopupMenu();
-    AppendMenuW(placement, MF_STRING | (app.settings.pillPlacement == 0 ? MF_CHECKED : 0), ID_PLACE_CLOCK,
-                T(L"Над часами", L"Above the clock"));
-    AppendMenuW(placement, MF_STRING | (app.settings.pillPlacement == 1 ? MF_CHECKED : 0), ID_PLACE_TASKBAR,
-                T(L"На панели задач", L"On the taskbar"));
-    AppendMenuW(placement, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(placement, MF_STRING | (app.settings.pillUnlocked ? MF_CHECKED : 0), ID_MOVE,
-                T(L"Переместить виджет", L"Move widget"));
-    AppendMenuW(placement, MF_STRING, ID_PLACE_RESET, T(L"Сбросить позицию", L"Reset position"));
-    AppendMenuW(menu, MF_POPUP, (UINT_PTR)placement, T(L"Расположение", L"Placement"));
-
-    HMENU style = CreatePopupMenu();
-    AppendMenuW(style, MF_STRING | (app.settings.pillMode == 0 ? MF_CHECKED : 0), ID_MODE_DETAILED,
-                T(L"Подробно: значок, батарея, процент", L"Detailed: icon, battery, percent"));
-    AppendMenuW(style, MF_STRING | (app.settings.pillMode == 1 ? MF_CHECKED : 0), ID_MODE_COMPACT,
-                T(L"Компактно: значок и процент", L"Compact: icon and percent"));
-    AppendMenuW(style, MF_STRING | (app.settings.pillMode == 2 ? MF_CHECKED : 0), ID_MODE_PERCENT,
-                T(L"Только процент", L"Percent only"));
-    AppendMenuW(style, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(style, MF_STRING | (app.settings.pillBackground ? MF_CHECKED : 0), ID_PILL_BG,
-                T(L"Фон пилюли", L"Pill background"));
-    AppendMenuW(menu, MF_POPUP, (UINT_PTR)style, T(L"Вид пилюли", L"Pill style"));
-    AppendMenuW(menu, MF_STRING | (app.settings.hideFullscreen ? MF_CHECKED : 0), ID_HIDE_FULLSCREEN,
-                T(L"Скрывать в полноэкранном режиме", L"Hide in fullscreen"));
-
-    HMENU monitors = CreatePopupMenu();
-    const auto monitorList = ListMonitors();
-    if (monitorList.empty()) {
-        AppendMenuW(monitors, MF_STRING | MF_DISABLED, 0, T(L"Мониторы не найдены", L"No monitors"));
-    } else {
-        const int nonPrimary = (int)monitorList.size() -
-                               (monitorList[0].primary ? 1 : 0);
-        int extra = 0;
-        for (size_t i = 0; i < monitorList.size() && i < 16; i++) {
-            const MonitorLite& m = monitorList[i];
-            std::wstring label;
-            if (m.primary) {
-                label = T(L"Основной", L"Primary");
-            } else {
-                ++extra;
-                label = T(L"Дополнительный", L"Additional");
-                if (nonPrimary > 1) label += Fmt(L" %d", extra);
-            }
-            AppendMenuW(monitors, MF_STRING | (app.settings.monitorIndex == (int)i ? MF_CHECKED : 0),
-                        ID_MONITOR_FIRST + (UINT)i, label.c_str());
-        }
-    }
-    AppendMenuW(menu, MF_POPUP, (UINT_PTR)monitors, T(L"Монитор", L"Monitor"));
-
-    HMENU language = CreatePopupMenu();
-    AppendMenuW(language, MF_STRING | (app.settings.language == 0 ? MF_CHECKED : 0), ID_LANG_AUTO,
-                T(L"Авто", L"Auto"));
-    AppendMenuW(language, MF_STRING | (app.settings.language == 1 ? MF_CHECKED : 0), ID_LANG_RU,
-                L"Русский");
-    AppendMenuW(language, MF_STRING | (app.settings.language == 2 ? MF_CHECKED : 0), ID_LANG_EN,
-                T(L"Английский", L"English"));
-    AppendMenuW(menu, MF_POPUP, (UINT_PTR)language, T(L"Язык", L"Language"));
-
+    AppendMenuW(menu, MF_STRING, ID_SETTINGS, T(L"Настройки", L"Settings"));
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, ID_QUIT, T(L"Выход", L"Exit"));
 
@@ -276,7 +188,11 @@ void HandleCommand(UINT id) {
         return;
     }
     if (id == ID_PANEL) {
-        ui::TogglePanelNow();
+        ui::ShowPanelNow();
+        return;
+    }
+    if (id == ID_SETTINGS) {
+        ui::ShowSettingsNow();
         return;
     }
     if (id == ID_AUTOSTART) {
@@ -680,6 +596,12 @@ int Run(int argc, wchar_t** argv) {
     hooks.menu = [] { ShowMenu(app.hwnd); };
     hooks.refresh = [] { SetEvent(app.wakeEvent); };
     hooks.settingsChanged = [] { SaveSettingsNow(); };
+    hooks.settingsApplied = [] {
+        EnsureAutostart(app.settings.autoStart);
+        SetUiLanguage(app.settings.language);
+        SaveSettingsNow();
+        ui::SetSettings(app.settings);
+    };
     ui::Init(app.inst, &app.settings, hooks);
 
     SetTimer(app.hwnd, TIMER_TICK, 300, nullptr);

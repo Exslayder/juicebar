@@ -25,6 +25,9 @@ All notable changes to WattPill are documented here. The format follows
   and panel to that display.
 - Settings open from the pill's right-click menu; the panel is pure content, without a wordmark,
   device count or gear.
+- A settings panel in the device-panel style: toggle switches and segmented buttons for every
+  option, applied immediately (no Save), closing when the pointer leaves. The pill's right-click
+  menu is now just *Open panel*, *Refresh*, *Settings* and *Exit*.
 - Dark/light native menu following the Windows app theme.
 - Panel slide-and-fade animation.
 - DirectWrite rendering for the pill text (the same grayscale rasterizer as WPF), with the GDI+ path

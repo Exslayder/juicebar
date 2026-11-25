@@ -142,15 +142,26 @@ a PC reboot or a gap longer than 30 minutes starts a new run). It uses up to 30 
 
 Right-click the pill:
 
+- **Open panel** — show the device panel.
 - **Refresh** — poll the devices right now.
-- **Placement** — *Above the clock* (default) or *On the taskbar*; *Move widget* (drag the pill
-  freely anywhere on the monitor) and *Reset position*.
-- **Pill style** — detailed, compact or percent only; optional Fluent background plate.
-- **Hide in fullscreen**.
-- **Monitor** — *Основной* or *Дополнительный* (with a number when there are several).
-- **Start with Windows** — checked by default; toggles the `HKCU\…\Run` entry.
-- **Language** — *Auto* (the Windows language), *Русский* or *English*.
+- **Settings** — open the settings panel.
 - **Exit**.
+
+### Settings
+
+The settings panel uses the same card language as the device panel: a title, one rounded card,
+one row per option, toggle switches and segmented buttons. Everything applies immediately — there
+is no Save button — and the panel closes when the pointer leaves it.
+
+- **Start with Windows** — toggle.
+- **Move widget** — toggle; when on, a plain drag moves the pill freely.
+- **Pill background** — toggle the Fluent plate.
+- **Hide in fullscreen** — toggle.
+- **Placement** — *Above clock* / *On taskbar*.
+- **Pill style** — *Detailed* / *Compact* / *Percent*.
+- **Monitor** — *Основной* / *Дополнительный* (only shown with more than one display).
+- **Language** — *Auto* / *Рус* / *Eng*.
+- **Reset position** — returns the pill to its default taskbar spot.
 
 Hovering the pill shows a small hint: *Shift — move along the taskbar* and *Ctrl — move freely*.
 With *Move widget* enabled, a plain drag moves freely as well.
@@ -158,9 +169,8 @@ With *Move widget* enabled, a plain drag moves freely as well.
 ## Languages
 
 The first run follows the Windows UI language: a Russian Windows uses Russian, everything else
-uses English. Right-click → Language lets you switch between *Auto*, *Русский* and *English*; the
-choice is saved in `settings.ini` and applies immediately, including the duration strings in the
-panel.
+uses English. *Settings → Language* switches between *Auto*, *Рус* and *Eng*; the choice is saved in
+`settings.ini` and applies immediately, including the duration strings in the panel.
 
 ## Command line
 

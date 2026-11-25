@@ -66,18 +66,20 @@ DPI from 100 % to 200 % is handled by scaling every metric from the system DPI.
 
 ## Settings
 
-The right-click menu on the pill is the only settings surface:
+Right-click the pill opens a short native menu: *Open panel*, *Refresh*, *Settings*, *Exit*. The
+menu is dark or light with the Windows app theme.
 
-- Refresh
-- Placement: above the clock, on the taskbar, Move widget (free drag), Reset position
-- Pill style: detailed, compact, percent only; pill background
-- Hide in fullscreen
-- Monitor: *Основной* and *Дополнительный* (adds a number when there are several)
-- Start with Windows
-- Language: Auto, Russian, English
-- Exit
+*Settings* opens a second panel with the same 440 DIP card, 20 px radius, Inter typography and
+neutral surfaces as the device list:
 
-The menu is a standard Win32 popup themed dark or light with the Windows app theme.
+- a small **Настройки** title and one rounded card;
+- one row per option, separated by a hairline;
+- **toggle switches** for Start with Windows, Move widget, Pill background and Hide in fullscreen;
+- **segmented buttons** for Placement, Pill style, Monitor and Language;
+- a **Reset position** action row.
+
+There is no Save button: every change is applied and persisted immediately. The panel closes when
+the pointer leaves it, so it never sits in the way.
 
 ## Layout
 
@@ -85,11 +87,11 @@ The menu is a standard Win32 popup themed dark or light with the Windows app the
 ┌────────────────────────────────────────────┐
 │  ┌──────────────────────────────────────┐  │
 │  │  (icon)  Razer Barracuda X 2.4  48%  │  │
-│  │          2.4 GHz · Расход стабилен   │  │
+│  │          2.4 GHz · ≈ 3 дня           │  │
 │  └──────────────────────────────────────┘  │
 │  ┌──────────────────────────────────────┐  │
-│  │  (icon)  SteelSeries Aerox 3    90%  │  │
-│  │          2.4 GHz · ≈ 4 ч             │  │
+│  │  (icon)  SteelSeries Aerox 3    80%  │  │
+│  │          2.4 GHz · ≈ 9 ч             │  │
 │  └──────────────────────────────────────┘  │
 └────────────────────────────────────────────┘
 ```
