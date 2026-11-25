@@ -12,9 +12,11 @@ All notable changes to WattPill are documented here. The format follows
   height, and hides while the taskbar auto-hides. A 300 ms guard plus a foreground WinEvent hook
   keeps it above `Shell_TrayWnd` without `SetParent`; Explorer restarts and display changes
   re-anchor it.
-- Manual pill position: Shift-drag moves it along the taskbar; *Placement → Move widget* drags it
-  freely anywhere on the monitor; *Placement → Reset position* returns to the default.
-- Hovering the pill shows a small rounded hint: *Зажми Shift для перемещения*.
+- Manual pill position: Shift-drag moves it along the taskbar; hold Ctrl (or *Placement → Move
+  widget*) to drag it freely anywhere on the monitor; *Placement → Reset position* returns to the
+  default.
+- Hovering the pill shows a two-line hint: *Shift — двигать по панели* and *Ctrl — свободно по
+  экрану*.
 - Pill styles: detailed (glyph, battery capsule, percentage), compact (glyph and percentage) and
   percent only, plus an optional Fluent background plate.
 - While charging, the pill bolt and percentage are green.

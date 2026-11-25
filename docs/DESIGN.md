@@ -104,12 +104,12 @@ taskbar and notification-area rectangles on every guard tick:
 
 - **On the taskbar** — vertically centered inside the bar, left of the tray with an 8 DIP gap.
 - **Above the clock** — right-aligned with the tray, 4 DIP above the bar.
-- **Manual** — Shift-drag records a horizontal offset from the taskbar's right edge; it is clamped so
-  the pill can never leave the bar. *Move widget* makes a plain drag move the pill freely anywhere
-  on the monitor (X and Y), and the position is stored relative to that monitor. *Reset position*
-  returns to the default.
+- **Manual** — Shift-drag moves the pill along the taskbar (offset from its right edge). Hold Ctrl,
+  or enable *Move widget*, to drag it freely anywhere on the monitor (X and Y); the free position is
+  stored relative to that monitor. *Reset position* returns to the default.
 
-Hovering the pill shows a small rounded hint, *Hold Shift to move*, above it.
+Hovering the pill shows a two-line rounded hint: *Shift — move along the taskbar* and
+*Ctrl — move freely*.
 
 The panel follows the same anchor, stays inside the monitor's work area and re-centers when the
 pill moves.

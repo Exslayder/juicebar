@@ -534,11 +534,17 @@ void HideTip() {
 
 void RenderTip() {
     if (!g.tip) return;
-    const std::wstring text = Tr(L"Зажми Shift для перемещения", L"Hold Shift to move");
+    const std::wstring line1 = Tr(L"Shift — двигать по панели", L"Shift — move along the taskbar");
+    const std::wstring line2 = Tr(L"Ctrl — свободно по экрану", L"Ctrl — move freely");
     Canvas probe(4, 4);
-    const float textW = TextWidth(*probe.g, text, g.fonts.small.get());
+    const float w1 = TextWidth(*probe.g, line1, g.fonts.small.get());
+    const float w2 = TextWidth(*probe.g, line2, g.fonts.small.get());
+    const float textW = std::max(w1, w2);
     const int padX = (int)std::lround(11 * g.scale);
-    const int height = (int)std::lround(30 * g.scale);
+    const int padY = (int)std::lround(7 * g.scale);
+    const int lineH = (int)std::lround(16 * g.scale);
+    const int gap = (int)std::lround(1 * g.scale);
+    const int height = padY * 2 + lineH * 2 + gap;
     const int width = (int)std::lround(textW) + padX * 2;
     g.tipW = width;
     g.tipH = height;
@@ -548,7 +554,10 @@ void RenderTip() {
     const int radius = (int)std::lround(8 * g.scale);
     FillRound(g2, RectF(0, 0, (float)width, (float)height), (float)radius, g.theme.card);
     StrokeRound(g2, RectF(0.5f, 0.5f, width - 1.0f, height - 1.0f), (float)radius, g.theme.border, 1.0f);
-    Text(g2, text, g.fonts.small.get(), RectF((float)padX, 0, textW + 2, (float)height),
+    Text(g2, line1, g.fonts.small.get(),
+         RectF((float)padX, (float)padY, textW + 2, (float)lineH), g.theme.text, StringAlignmentNear);
+    Text(g2, line2, g.fonts.small.get(),
+         RectF((float)padX, (float)(padY + lineH + gap), textW + 2, (float)lineH),
          g.theme.text, StringAlignmentNear);
 
     const RECT pill = g.pillRect;
@@ -1280,19 +1289,25 @@ LRESULT CALLBACK PillProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_LBUTTONDOWN:
             KillTimer(h, kPillTipTimer);
             HideTip();
-            if ((GetKeyState(VK_SHIFT) < 0 || g.settings->pillUnlocked) && g.pillRect.right > g.pillRect.left) {
-                POINT p{};
-                GetCursorPos(&p);
-                g.dragArmed = true;
-                g.dragMoved = false;
-                g.dragFree = g.settings->pillUnlocked && (GetKeyState(VK_SHIFT) >= 0);
-                if (!g.dragFree) g.settings->pillFree = false;
-                g.dragStartX = p.x;
-                g.dragStartY = p.y;
-                g.dragStartLeft = g.pillRect.left;
-                g.dragStartTop = g.pillRect.top;
-                SetCapture(h);
-                return 0;
+            {
+                const bool shift = GetKeyState(VK_SHIFT) < 0;
+                const bool ctrl = GetKeyState(VK_CONTROL) < 0;
+                if ((shift || ctrl || g.settings->pillUnlocked) && g.pillRect.right > g.pillRect.left) {
+                    POINT p{};
+                    GetCursorPos(&p);
+                    g.dragArmed = true;
+                    g.dragMoved = false;
+                    // Ctrl always moves freely; Move widget does the same without a modifier, while
+                    // Shift keeps the classic movement along the taskbar.
+                    g.dragFree = ctrl || (g.settings->pillUnlocked && !shift);
+                    if (!g.dragFree) g.settings->pillFree = false;
+                    g.dragStartX = p.x;
+                    g.dragStartY = p.y;
+                    g.dragStartLeft = g.pillRect.left;
+                    g.dragStartTop = g.pillRect.top;
+                    SetCapture(h);
+                    return 0;
+                }
             }
             break;
         case WM_LBUTTONUP: {
@@ -1324,10 +1339,11 @@ LRESULT CALLBACK PillProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             return 0;
         case WM_SETCURSOR:
             if (LOWORD(lp) == HTCLIENT) {
-                const bool free = g.settings->pillUnlocked && (GetKeyState(VK_SHIFT) >= 0);
+                const bool shift = GetKeyState(VK_SHIFT) < 0;
+                const bool ctrl = GetKeyState(VK_CONTROL) < 0;
+                const bool free = ctrl || (g.settings->pillUnlocked && !shift);
                 SetCursor(LoadCursorW(nullptr, free || g.dragFree ? IDC_SIZEALL
-                                         : (GetKeyState(VK_SHIFT) < 0 || g.dragArmed) ? IDC_SIZEWE
-                                                                                     : IDC_ARROW));
+                                         : (shift || g.dragArmed) ? IDC_SIZEWE : IDC_ARROW));
                 return TRUE;
             }
             break;

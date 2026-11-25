@@ -36,8 +36,9 @@ measurement, and it is labelled while the data is still thin.
   0 ms/s and the working set is under 25 MB.
 - **Sits on the taskbar, not over it.** The pill is inset into the taskbar, centered vertically, and
   uses the same height and hover weight as the Explorer tray buttons. *Placement → On the taskbar*
-  docks it left of the tray; *Above the clock* floats it over the clock. Shift-drag (or
-  right-click → *Move widget*) slides it anywhere along the bar; *Reset position* puts it back.
+  docks it left of the tray; *Above the clock* floats it over the clock. Shift-drag slides it along
+  the bar; Ctrl-drag (or right-click → *Move widget*) moves it freely anywhere on the monitor;
+  *Reset position* puts it back.
 - **A panel that behaves like a shell flyout.** It opens centered on the pill with a short slide and
   fade, keeps WattPill's own look (Inter, grouped cards, violet forecast accent) and contains no
   chrome; settings live on the pill's right-click menu.
@@ -73,9 +74,9 @@ Windows 10) or the uninstaller in the install folder. Your settings and history 
 The pill floats above the clock by default. Right-click → Placement → *On the taskbar* puts it
 left of the tray; *Above the clock* brings it back. Both are shown below.
 
-Shift-drag the pill to move it along the taskbar, or enable *Placement → Move widget* to drag it
-without holding Shift. *Placement → Reset position* returns it to the default spot; the offset is
-saved in `settings.ini` (`pill_manual`, `pill_offset`).
+Shift-drag the pill to move it along the taskbar, hold Ctrl (or enable *Placement → Move widget*) to
+drag it freely anywhere on the monitor. *Placement → Reset position* returns it to the default spot;
+the position is saved in `settings.ini` (`pill_free`, `pill_free_x/y`, or `pill_manual` + `pill_offset`).
 
 ![Pill placement](docs/placement.png)
 
@@ -151,7 +152,8 @@ Right-click the pill:
 - **Language** — *Auto* (the Windows language), *Русский* or *English*.
 - **Exit**.
 
-Hovering the pill shows a small hint: *Hold Shift to move*.
+Hovering the pill shows a small hint: *Shift — move along the taskbar* and *Ctrl — move freely*.
+With *Move widget* enabled, a plain drag moves freely as well.
 
 ## Languages
 
