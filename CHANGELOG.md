@@ -16,10 +16,14 @@ All notable changes to WattPill are documented here. The format follows
   The offset is stored in `settings.ini`.
 - Pill styles: detailed (glyph, battery capsule, percentage), compact (glyph and percentage) and
   percent only, plus an optional Fluent background plate.
+- While charging, the pill bolt and percentage are green.
 - *Hide in fullscreen* option.
-- Panel header with the WattPill wordmark, device count and a settings gear; the gear opens the
-  same menu as right-click. *Open panel* is also in the tray menu.
+- *Monitor* selector: move the pill and panel to the primary or a secondary display.
+- Panel header with a single settings gear; the gear opens the same menu as right-click. *Open
+  panel* is also in the tray menu.
 - Panel slide-and-fade animation.
+- DirectWrite rendering for the pill text (the same grayscale rasterizer as WPF), with the GDI+ path
+  as a fallback.
 
 ### Changed
 
@@ -27,9 +31,11 @@ All notable changes to WattPill are documented here. The format follows
   radius 5, inset taskbar placement, Fluent glyphs, 16×9.5 battery capsule with nub and charging
   bolt, 12 px semibold percentages and the Windows 11 taskbar palette.
 - The panel keeps WattPill's own visual language (Inter, neutral cards, violet accent, Fluent
-  battery marks); it gained the compact header and gear instead of adopting PowerVision's flyout
-  skin.
+  battery marks) and a corner gear, without the wordmark and device count.
 - Devices that stop answering are removed instead of being shown as disconnected.
+- Forecasts are more stable: Theil–Sen slope instead of least squares, a 10-minute observation
+  window, no "calibration countdown", rounded remaining time and a `via · …` status prefix.
+- Polling defaults to 15 seconds (PowerVision polls every 10 seconds) for fresher percentages.
 
 ## [2.0.0] — 2026-11-24
 

@@ -4,7 +4,7 @@
 namespace ch {
 
 struct Settings {
-    int pollSeconds = 60;
+    int pollSeconds = 15;
     bool showPill = true;
     bool dimSleeping = true;
     bool autoStart = true;
@@ -15,6 +15,7 @@ struct Settings {
     int pillMode = 0;          // 0 detailed, 1 compact, 2 percent only
     bool pillBackground = false; // draw the Fluent taskbar plate behind the pill
     bool hideFullscreen = true;  // hide the widget in fullscreen apps
+    int monitorIndex = 0;        // 0 = primary, 1 = next monitor, ...
     int language = 0;   // 0 auto, 1 ru, 2 en
 };
 

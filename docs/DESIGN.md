@@ -32,11 +32,11 @@ surface ladder (`#202020` panel, `#2B2B2B` cards), Inter for all text, 16 px car
 violet forecast accent. It opens from the pill or the gear, centered on the widget, with a short
 slide and fade.
 
-- A compact header holds the **WattPill** wordmark, the device count and a single gear button.
-  The gear brightens and turns 60° under the pointer, then opens the settings menu.
+- A compact header holds only the settings gear. The gear brightens and turns 60° under the
+  pointer, then opens the settings menu.
 - Each device is an 80 DIP row: a 22 px device glyph, the name in 14.5 px semibold, the status or
-  forecast in 13.5 px, the percentage in 19 px semibold and a Fluent battery mark that morphs
-  between levels.
+  forecast in 13.5 px (prefixed with the connection, e.g. `2.4 GHz · ≈ 4 ч`), the percentage in
+  19 px semibold and a Fluent battery mark that morphs between levels.
 - Cards lift slightly on hover. The panel closes 200 ms after the pointer leaves it.
 
 Light/dark is taken from the Windows app theme; the pill separately follows the taskbar theme.
@@ -45,7 +45,9 @@ Light/dark is taken from the Windows app theme; the pill separately follows the 
 
 - **Panel:** Inter (bundled, OFL) in three weights: text, medium, semibold. Registered privately at
   runtime, so the look does not depend on what is installed.
-- **Pill:** Segoe UI Semibold at 12 px, which hints better at taskbar scale than Inter.
+- **Pill:** Segoe UI Variable Text / Segoe UI Semibold at 12 px, rendered with **DirectWrite** — the
+  same grayscale rasterizer WPF uses — so the digits stay crisp at taskbar size without a .NET
+  runtime. The GDI+ path remains as a fallback.
 
 DPI from 100 % to 200 % is handled by scaling every metric from the system DPI.
 
@@ -72,6 +74,7 @@ The gear and the right-click menu open the same native menu:
 - Placement: above the clock, on the taskbar, Move widget, Reset position
 - Pill style: detailed, compact, percent only; pill background
 - Hide in fullscreen
+- Monitor: primary or any connected display
 - Start with Windows
 - Language: Auto, Russian, English
 - Exit
@@ -82,15 +85,14 @@ The menu is a standard Win32 popup, so it follows the system theme, keyboard nav
 
 ```
 ┌────────────────────────────────────────────┐
-│  WattPill                             ⚙    │
-│  2 устройства                              │
+│                                       ⚙    │
 │  ┌──────────────────────────────────────┐  │
 │  │  (icon)  Razer Barracuda X 2.4  48%  │  │
-│  │          Drain is steady             │  │
+│  │          2.4 GHz · Расход стабилен   │  │
 │  └──────────────────────────────────────┘  │
 │  ┌──────────────────────────────────────┐  │
-│  │  (icon)  SteelSeries Aerox 3    100% │  │
-│  │          Fully charged               │  │
+│  │  (icon)  SteelSeries Aerox 3    90%  │  │
+│  │          2.4 GHz · ≈ 4 ч             │  │
 │  └──────────────────────────────────────┘  │
 └────────────────────────────────────────────┘
 ```

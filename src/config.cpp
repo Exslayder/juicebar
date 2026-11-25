@@ -135,6 +135,7 @@ Settings LoadSettings(const std::wstring& file) {
         else if (key == L"pill_mode") s.pillMode = ToInt(value, 0);
         else if (key == L"pill_background") s.pillBackground = ToInt(value, 0) != 0;
         else if (key == L"hide_fullscreen") s.hideFullscreen = ToInt(value, 1) != 0;
+        else if (key == L"monitor") s.monitorIndex = ToInt(value, 0);
         else if (key == L"language") s.language = ToInt(value, 0);
     }
 
@@ -144,6 +145,7 @@ Settings LoadSettings(const std::wstring& file) {
     s.pillPlacement = std::clamp(s.pillPlacement, 0, 1);
     s.pillOffset = std::clamp(s.pillOffset, 0, 4000);
     s.pillMode = std::clamp(s.pillMode, 0, 2);
+    s.monitorIndex = std::clamp(s.monitorIndex, 0, 15);
     return s;
 }
 
@@ -162,6 +164,7 @@ bool SaveSettings(const std::wstring& file, const Settings& s) {
     text += "pill_mode=" + std::to_string(std::clamp(s.pillMode, 0, 2)) + "\n";
     text += std::string("pill_background=") + (s.pillBackground ? "1" : "0") + "\n";
     text += std::string("hide_fullscreen=") + (s.hideFullscreen ? "1" : "0") + "\n";
+    text += "monitor=" + std::to_string(std::clamp(s.monitorIndex, 0, 15)) + "\n";
     text += "language=" + std::to_string(s.language) + "\n";
 
     const std::wstring tmp = file + L".tmp";

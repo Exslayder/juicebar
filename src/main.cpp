@@ -51,6 +51,7 @@ enum MenuId : UINT {
     ID_MODE_PERCENT = 176,
     ID_PILL_BG = 177,
     ID_HIDE_FULLSCREEN = 178,
+    ID_MONITOR_FIRST = 200,
     ID_LANG_AUTO = 180,
     ID_LANG_RU = 181,
     ID_LANG_EN = 182,
@@ -152,6 +153,34 @@ void RemoveLegacyAutostart() {
 
 // ---------------------------------------------------------------- menu
 
+struct MonitorLite {
+    RECT rect{};
+    bool primary = false;
+};
+
+std::vector<MonitorLite> ListMonitors() {
+    std::vector<MonitorLite> monitors;
+    EnumDisplayMonitors(nullptr, nullptr,
+                        [](HMONITOR mon, HDC, LPRECT, LPARAM data) -> BOOL {
+                            auto* out = reinterpret_cast<std::vector<MonitorLite>*>(data);
+                            MONITORINFO mi{ sizeof(mi) };
+                            if (GetMonitorInfoW(mon, &mi)) {
+                                MonitorLite entry;
+                                entry.rect = mi.rcMonitor;
+                                entry.primary = (mi.dwFlags & MONITORINFOF_PRIMARY) != 0;
+                                out->push_back(entry);
+                            }
+                            return TRUE;
+                        },
+                        (LPARAM)&monitors);
+    std::stable_sort(monitors.begin(), monitors.end(), [](const MonitorLite& a, const MonitorLite& b) {
+        if (a.primary != b.primary) return a.primary;
+        if (a.rect.left != b.rect.left) return a.rect.left < b.rect.left;
+        return a.rect.top < b.rect.top;
+    });
+    return monitors;
+}
+
 void ShowMenu(HWND owner) {
     HMENU menu = CreatePopupMenu();
     AppendMenuW(menu, MF_STRING | MF_DISABLED, 0, L"WattPill");
@@ -185,6 +214,22 @@ void ShowMenu(HWND owner) {
     AppendMenuW(menu, MF_POPUP, (UINT_PTR)style, T(L"Вид пилюли", L"Pill style"));
     AppendMenuW(menu, MF_STRING | (app.settings.hideFullscreen ? MF_CHECKED : 0), ID_HIDE_FULLSCREEN,
                 T(L"Скрывать в полноэкранном режиме", L"Hide in fullscreen"));
+
+    HMENU monitors = CreatePopupMenu();
+    const auto monitorList = ListMonitors();
+    if (monitorList.empty()) {
+        AppendMenuW(monitors, MF_STRING | MF_DISABLED, 0, T(L"Мониторы не найдены", L"No monitors"));
+    } else {
+        for (size_t i = 0; i < monitorList.size() && i < 16; i++) {
+            const MonitorLite& m = monitorList[i];
+            const int w = m.rect.right - m.rect.left, h = m.rect.bottom - m.rect.top;
+            std::wstring label = Fmt(L"%d · %d×%d", (int)i + 1, w, h);
+            if (m.primary) label += T(L" (основной)", L" (primary)");
+            AppendMenuW(monitors, MF_STRING | (app.settings.monitorIndex == (int)i ? MF_CHECKED : 0),
+                        ID_MONITOR_FIRST + (UINT)i, label.c_str());
+        }
+    }
+    AppendMenuW(menu, MF_POPUP, (UINT_PTR)monitors, T(L"Монитор", L"Monitor"));
 
     HMENU language = CreatePopupMenu();
     AppendMenuW(language, MF_STRING | (app.settings.language == 0 ? MF_CHECKED : 0), ID_LANG_AUTO,
@@ -265,6 +310,12 @@ void HandleCommand(UINT id) {
     }
     if (id == ID_HIDE_FULLSCREEN) {
         app.settings.hideFullscreen = !app.settings.hideFullscreen;
+        SaveSettingsNow();
+        ui::SetSettings(app.settings);
+        return;
+    }
+    if (id >= ID_MONITOR_FIRST && id < ID_MONITOR_FIRST + 16) {
+        app.settings.monitorIndex = (int)(id - ID_MONITOR_FIRST);
         SaveSettingsNow();
         ui::SetSettings(app.settings);
         return;

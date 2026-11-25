@@ -2,6 +2,7 @@
 // forecast. Everything is drawn by hand on a premultiplied 32-bit surface and pushed with
 // UpdateLayeredWindow, so the pill and the panel get real rounded corners and soft alpha.
 #include "ui.h"
+#include "dwrite_text.h"
 
 #include <propidl.h>
 #include <gdiplus.h>
@@ -352,7 +353,7 @@ Color BatteryTint(const Card& card) {
     if (card.reading.charging) return g.theme.charging;
     if (card.reading.connected && card.reading.percent >= 0) {
         if (card.reading.percent <= 20) return g.theme.red;
-        if (card.reading.percent <= 30) return g.theme.amber;
+        if (card.reading.percent <= 45) return g.theme.amber;
     }
     return g.theme.green;
 }
@@ -371,29 +372,26 @@ std::wstring StatusLine(const Card& card) {
     if (r.asleep && r.percent < 0) return Tr(L"Ждём первый замер", L"Waiting for the first reading");
     if (r.asleep) return Tr(L"Нет ответа · последний замер", L"No answer · last reading");
 
+    const std::wstring prefix = r.via.empty() ? L"" : (r.via + L" · ");
+
     if (r.charging) {
         if (f.state == ForecastState::Charging && f.minutes >= 0)
-            return std::wstring(Tr(L"Заряжается · до полного ", L"Charging · ")) + FormatSpan(f.minutes);
-        if (r.full || r.percent >= 100) return Tr(L"Полностью заряжено", L"Fully charged");
-        return Tr(L"Заряжается", L"Charging");
+            return prefix + Tr(L"Заряжается · до полного ", L"Charging · ") + FormatSpan(f.minutes);
+        if (r.full || r.percent >= 100) return prefix + Tr(L"Полностью заряжено", L"Fully charged");
+        return prefix + Tr(L"Заряжается", L"Charging");
     }
 
     switch (f.state) {
         case ForecastState::Ready:
-        case ForecastState::LowConfidence: {
-            return std::wstring(L"≈ ") + FormatSpan(f.minutes);
-        }
+        case ForecastState::LowConfidence:
+            return prefix + L"≈ " + FormatSpan(f.minutes);
         case ForecastState::Flat:
-            return Tr(L"Расход стабилен", L"Drain is steady");
+            return prefix + Tr(L"Расход стабилен", L"Drain is steady");
         case ForecastState::Learning:
-            // A single point has no observed span yet; do not claim a fixed "15 min" forever.
-            if (f.needSec > 0 && f.samples > 1)
-                return Tr(L"Калибровка · ещё ", L"Calibrating · ") + FormatSpan((f.needSec + 59) / 60);
-            return Tr(L"Калибровка", L"Calibrating");
+            return prefix + Tr(L"Калибровка", L"Calibrating");
         case ForecastState::NoData:
-            return Tr(L"Ожидание данных", L"Waiting for data");
         default:
-            return Tr(L"Ожидание данных", L"Waiting for data");
+            return prefix + Tr(L"Ожидание данных", L"Waiting for data");
     }
 }
 
@@ -424,10 +422,95 @@ const wchar_t* KindGlyph(Kind kind) {
 }
 
 Color PillTier(const Card& card) {
-    if (card.reading.charging) return g.theme.battCharging;
+    if (card.reading.charging) return g.theme.battGood;
     if (card.reading.percent <= 20) return g.theme.battLow;
     if (card.reading.percent <= 45) return g.theme.battMid;
     return g.theme.battGood;
+}
+
+// ---------------------------------------------------------------- monitor/taskbar layout
+
+struct MonitorEntry {
+    HMONITOR handle = nullptr;
+    RECT rect{};
+    RECT work{};
+    bool primary = false;
+};
+
+BOOL CALLBACK CollectMonitorProc(HMONITOR mon, HDC, LPRECT, LPARAM data) {
+    auto* list = reinterpret_cast<std::vector<MonitorEntry>*>(data);
+    MONITORINFO mi{ sizeof(mi) };
+    if (!GetMonitorInfoW(mon, &mi)) return TRUE;
+    MonitorEntry entry;
+    entry.handle = mon;
+    entry.rect = mi.rcMonitor;
+    entry.work = mi.rcWork;
+    entry.primary = (mi.dwFlags & MONITORINFOF_PRIMARY) != 0;
+    list->push_back(entry);
+    return TRUE;
+}
+
+std::vector<MonitorEntry> Monitors() {
+    std::vector<MonitorEntry> list;
+    EnumDisplayMonitors(nullptr, nullptr, CollectMonitorProc, (LPARAM)&list);
+    std::stable_sort(list.begin(), list.end(), [](const MonitorEntry& a, const MonitorEntry& b) {
+        if (a.primary != b.primary) return a.primary;
+        if (a.rect.left != b.rect.left) return a.rect.left < b.rect.left;
+        return a.rect.top < b.rect.top;
+    });
+    return list;
+}
+
+HMONITOR MonitorAt(int index) {
+    const auto list = Monitors();
+    if (list.empty()) return MonitorFromPoint(POINT{ 0, 0 }, MONITOR_DEFAULTTOPRIMARY);
+    return list[(size_t)std::clamp(index, 0, (int)list.size() - 1)].handle;
+}
+
+struct BarLayout {
+    bool found = false;
+    HWND taskbar = nullptr;
+    RECT monitor{}, work{}, bar{}, notify{};
+    bool atTop = false;
+    bool horizontal = true;
+};
+
+BOOL CALLBACK CollectBarProc(HWND hwnd, LPARAM data) {
+    auto* pair = reinterpret_cast<std::pair<HMONITOR, BarLayout*>*>(data);
+    wchar_t cls[64] = {};
+    GetClassNameW(hwnd, cls, 64);
+    if (_wcsicmp(cls, L"Shell_TrayWnd") && _wcsicmp(cls, L"Shell_SecondaryTrayWnd")) return TRUE;
+    if (MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) != pair->first) return TRUE;
+    RECT rect{};
+    if (!GetWindowRect(hwnd, &rect) || rect.right <= rect.left || rect.bottom <= rect.top) return TRUE;
+    BarLayout& layout = *pair->second;
+    layout.found = true;
+    layout.taskbar = hwnd;
+    layout.bar = rect;
+    if (HWND notify = FindWindowExW(hwnd, nullptr, L"TrayNotifyWnd", nullptr))
+        GetWindowRect(notify, &layout.notify);
+    return FALSE;
+}
+
+BarLayout BarForMonitor(HMONITOR mon) {
+    BarLayout layout;
+    MONITORINFO mi{ sizeof(mi) };
+    if (mon && GetMonitorInfoW(mon, &mi)) {
+        layout.monitor = mi.rcMonitor;
+        layout.work = mi.rcWork;
+    } else {
+        layout.monitor = { 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN) };
+        layout.work = layout.monitor;
+    }
+    std::pair<HMONITOR, BarLayout*> data{ mon, &layout };
+    EnumWindows(CollectBarProc, (LPARAM)&data);
+    if (layout.found) {
+        const int w = layout.bar.right - layout.bar.left;
+        const int h = layout.bar.bottom - layout.bar.top;
+        layout.horizontal = w >= h;
+        layout.atTop = layout.bar.top < layout.monitor.top + (int)std::lround(40 * g.scale);
+    }
+    return layout;
 }
 
 // The taskbar pill is a metric-for-metric native re-creation of PowerVision's widget:
@@ -437,14 +520,10 @@ Color PillTier(const Card& card) {
 void RenderPill() {
     if (!g.pill) return;
 
-    HWND taskbar = FindWindowW(L"Shell_TrayWnd", nullptr);
-    HWND notify = taskbar ? FindWindowExW(taskbar, nullptr, L"TrayNotifyWnd", nullptr) : nullptr;
-    if (!taskbar || !notify) return;
-    RECT barRect{}, notifyRect{};
-    GetWindowRect(taskbar, &barRect);
-    GetWindowRect(notify, &notifyRect);
+    const BarLayout layout = BarForMonitor(MonitorAt(g.settings->monitorIndex));
+    RECT barRect = layout.bar, notifyRect = layout.notify;
     const int barW = barRect.right - barRect.left, barH = barRect.bottom - barRect.top;
-    if (barW <= barH) return;   // vertical taskbar
+    if (layout.found && barW <= barH) return;   // vertical taskbar
 
     if (g.taskbarHidden) {
         ShowWindow(g.pill, SW_HIDE);
@@ -526,13 +605,38 @@ void RenderPill() {
     }
 
     const float cy = rootY + rootH / 2;
+
+    // The pill draws its text with DirectWrite (the WPF rasterizer) when available; the GDI+ path
+    // remains as a fallback. Runs are collected and composited after the shapes.
+    std::vector<dwtext::Run> textRuns;
+    auto addText = [&](const std::wstring& value, Gdiplus::Font* fallback, dwtext::Face face, float px,
+                       int weight, RectF box, Color color, StringAlignment align) {
+        if (dwtext::Available()) {
+            dwtext::Run run;
+            run.text = value;
+            run.x = box.X;
+            run.y = box.Y;
+            run.w = box.Width;
+            run.h = box.Height;
+            run.align = align == StringAlignmentCenter ? 1 : align == StringAlignmentFar ? 2 : 0;
+            run.face = face;
+            run.px = px;
+            run.weight = weight;
+            run.argb = ((uint32_t)color.GetA() << 24) | ((uint32_t)color.GetR() << 16) |
+                       ((uint32_t)color.GetG() << 8) | (uint32_t)color.GetB();
+            textRuns.push_back(std::move(run));
+        } else {
+            Text(g2, value, fallback, box, color, align);
+        }
+    };
+
     if (empty) {
-        Text(g2, L"\uE702", g.fonts.pillGlyph.get(),
-             RectF(padX + 4 * g.scale, cy - 9 * g.scale, glyphW + 2 * g.scale, 18 * g.scale),
-             g.theme.pillSub, StringAlignmentNear);
-        Text(g2, L"\u2014", g.fonts.pillPct.get(),
-             RectF(padX + 4 * g.scale + glyphW + 5 * g.scale, cy - 9 * g.scale, emptyW + 2 * g.scale, 18 * g.scale),
-             g.theme.pillSub, StringAlignmentNear);
+        addText(L"\uE702", g.fonts.pillGlyph.get(), dwtext::Face::Glyph, 13.5f * g.scale, 400,
+                RectF(padX + 4 * g.scale, cy - 9 * g.scale, glyphW + 2 * g.scale, 18 * g.scale),
+                g.theme.pillSub, StringAlignmentNear);
+        addText(L"\u2014", g.fonts.pillPct.get(), dwtext::Face::Ui, 12.0f * g.scale, 600,
+                RectF(padX + 4 * g.scale + glyphW + 5 * g.scale, cy - 9 * g.scale, emptyW + 4 * g.scale, 18 * g.scale),
+                g.theme.pillSub, StringAlignmentNear);
     }
 
     for (const auto& item : items) {
@@ -541,9 +645,10 @@ void RenderPill() {
         const BYTE alpha = card.reading.asleep ? 150 : 255;
 
         if (showIcon) {
-            Text(g2, KindGlyph(card.reading.kind), g.fonts.pillGlyph.get(),
-                 RectF(item.x, cy - 9 * g.scale, item.glyphW + 2 * g.scale, 18 * g.scale),
-                 WithAlpha(off ? g.theme.pillSub : g.theme.pillInk, alpha), StringAlignmentNear);
+            addText(KindGlyph(card.reading.kind), g.fonts.pillGlyph.get(), dwtext::Face::Glyph,
+                    13.5f * g.scale, 400,
+                    RectF(item.x, cy - 9 * g.scale, item.glyphW + 2 * g.scale, 18 * g.scale),
+                    WithAlpha(off ? g.theme.pillSub : g.theme.pillInk, alpha), StringAlignmentNear);
         }
 
         if (showCapsule) {
@@ -566,27 +671,51 @@ void RenderPill() {
         }
 
         if (item.boltX >= 0) {
-            Text(g2, L"\uE945", g.fonts.pillBolt.get(),
-                 RectF(item.boltX, cy - 8 * g.scale, item.boltW + 2 * g.scale, 16 * g.scale),
-                 WithAlpha(g.theme.battCharging, alpha), StringAlignmentNear);
+            addText(L"\uE945", g.fonts.pillBolt.get(), dwtext::Face::Glyph, 9.5f * g.scale, 400,
+                    RectF(item.boltX, cy - 8 * g.scale, item.boltW + 2 * g.scale, 16 * g.scale),
+                    WithAlpha(g.theme.battGood, alpha), StringAlignmentNear);
         }
 
         Color textColor = off ? g.theme.pillSub
-                          : card.reading.charging ? g.theme.battCharging
+                          : card.reading.charging ? g.theme.battGood
                           : card.reading.percent <= 20 ? g.theme.battLow : g.theme.pillInk;
-        Text(g2, PercentText(card), g.fonts.pillPct.get(),
-             RectF(item.textX, cy - 9 * g.scale, item.textW + 2 * g.scale, 18 * g.scale),
-             WithAlpha(textColor, alpha), StringAlignmentNear);
+        addText(PercentText(card), g.fonts.pillPct.get(), dwtext::Face::Ui, 12.0f * g.scale, 600,
+                RectF(item.textX, cy - 9 * g.scale, item.textW + 4 * g.scale, 18 * g.scale),
+                WithAlpha(textColor, alpha), StringAlignmentNear);
+    }
+
+    if (!textRuns.empty()) {
+        canvas.g->Flush(FlushIntentionSync);
+        BitmapData data{};
+        Rect rect(0, 0, width, height);
+        if (canvas.bitmap->LockBits(&rect, ImageLockModeRead | ImageLockModeWrite,
+                                    PixelFormat32bppPARGB, &data) == Ok) {
+            dwtext::DrawRuns(data.Scan0, data.Stride, width, height, textRuns);
+            canvas.bitmap->UnlockBits(&data);
+        }
     }
 
     int px = 0, py = 0;
-    const bool barAtTop = barRect.top < (int)std::lround(40 * g.scale);
+    if (!layout.found) {
+        // A monitor without its own taskbar: sit just above the bottom of its work area.
+        px = layout.work.right - width - (int)std::lround(12 * g.scale);
+        py = layout.work.bottom - height - (int)std::lround(4 * g.scale);
+        px = std::clamp(px, (int)layout.work.left + 4, (int)layout.work.right - width - 4);
+        py = std::clamp(py, (int)layout.monitor.top + 4, (int)layout.monitor.bottom - height - 4);
+        g.pillRect = { px, py, px + width, py + height };
+        canvas.Present(g.pill, px, py);
+        return;
+    }
+
+    const bool barAtTop = layout.atTop;
     if (g.settings->pillManual) {
         px = barRect.right - (int)std::lround(g.settings->pillOffset * g.scale) - width;
     } else if (g.settings->pillPlacement == 1) {
-        px = notifyRect.left - width - (int)std::lround(8 * g.scale);
+        px = (notifyRect.right > notifyRect.left ? notifyRect.left : barRect.right - (int)std::lround(160 * g.scale)) -
+             width - (int)std::lround(8 * g.scale);
     } else {
-        px = notifyRect.right - (int)std::lround(12 * g.scale) - width;
+        px = (notifyRect.right > notifyRect.left ? notifyRect.right : barRect.right) -
+             (int)std::lround(12 * g.scale) - width;
     }
     const int minLeft = barRect.left + (int)std::lround(4 * g.scale);
     const int maxLeft = barRect.right - width - (int)std::lround(4 * g.scale);
@@ -609,23 +738,11 @@ void RenderPill() {
 
 int MeasurePanelHeight(int count) {
     const int pad = (int)std::lround(16 * g.scale);
-    const int header = (int)std::lround(44 * g.scale);
+    const int header = (int)std::lround(36 * g.scale);
     const int cardH = (int)std::lround(80 * g.scale);
     const int gap = (int)std::lround(10 * g.scale);
     const int body = count > 0 ? count * cardH + (count - 1) * gap : (int)std::lround(84 * g.scale);
     return pad + header + body + pad;
-}
-
-std::wstring PanelSummary() {
-    const int n = (int)g.cards.size();
-    if (n == 0) return Tr(L"Нет устройств", L"No devices");
-    if (g.settings->language == 2 || (g.settings->language == 0 && !RussianUi()))
-        return Fmt(L"%d device%s", n, n == 1 ? L"" : L"s");
-    const int mod100 = n % 100, mod10 = n % 10;
-    if (mod100 >= 11 && mod100 <= 14) return Fmt(L"%d устройств", n);
-    if (mod10 == 1) return Fmt(L"%d устройство", n);
-    if (mod10 >= 2 && mod10 <= 4) return Fmt(L"%d устройства", n);
-    return Fmt(L"%d устройств", n);
 }
 
 float TargetPercent(const Card& card) {
@@ -707,14 +824,9 @@ void RenderPanel() {
     FillRound(g2, RectF(0, 0, (float)width, (float)height), (float)radius, g.theme.bg);
     StrokeRound(g2, RectF(0.5f, 0.5f, width - 1.0f, height - 1.0f), (float)radius, g.theme.border, 1.0f);
 
-    // ---- header: wordmark, summary, refresh and settings
-    const int header = (int)std::lround(44 * g.scale);
-    Text(g2, L"WattPill", g.fonts.name.get(), RectF((float)pad, 10 * g.scale, 200 * g.scale, 22 * g.scale),
-         g.theme.text, StringAlignmentNear);
-    Text(g2, PanelSummary(), g.fonts.small.get(),
-         RectF((float)pad, 30 * g.scale, 200 * g.scale, 16 * g.scale), g.theme.sub, StringAlignmentNear, true);
-
-    g.settingsRect = RectF((float)(width - pad) - 32 * g.scale, 10 * g.scale, 32 * g.scale, 32 * g.scale);
+    // ---- header: just the settings gear, so the cards start close to the top
+    const int header = (int)std::lround(36 * g.scale);
+    g.settingsRect = RectF((float)(width - pad) - 32 * g.scale, 6 * g.scale, 32 * g.scale, 32 * g.scale);
     if (g.gearHoverT > 0.01f)
         FillRound(g2, g.settingsRect, 8 * g.scale, WithAlpha(g.theme.text, (BYTE)std::lround(16 * g.gearHoverT)));
     {
@@ -750,40 +862,25 @@ void RenderPanel() {
     }
 
     // ---- anchor above the widget / taskbar
-    RECT bar{};
-    HWND taskbar = FindWindowW(L"Shell_TrayWnd", nullptr);
-    RECT work{};
-    bool haveBar = taskbar != nullptr;
-    if (haveBar) {
-        GetWindowRect(taskbar, &bar);
-        HMONITOR mon = MonitorFromWindow(taskbar, MONITOR_DEFAULTTONEAREST);
-        MONITORINFO mi{ sizeof(mi) };
-        if (mon && GetMonitorInfoW(mon, &mi)) work = mi.rcWork;
-        else SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
-    } else {
-        SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
-    }
+    const BarLayout layout = BarForMonitor(MonitorAt(g.settings->monitorIndex));
+    const RECT bar = layout.bar;
+    RECT work = layout.work;
     if (work.right <= work.left || work.bottom <= work.top) {
         work = { 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN) };
     }
-    const bool barAtTop = haveBar && bar.top < (int)std::lround(40 * g.scale);
+    const bool barAtTop = layout.found && layout.atTop;
     const int anchorLeft = g.pillRect.right > g.pillRect.left ? g.pillRect.left
-                                                               : (haveBar ? bar.right - 100 : work.right - 100);
+                                                               : (layout.found ? bar.right - 100 : work.right - 100);
     const int anchorRight = g.pillRect.right > g.pillRect.left ? g.pillRect.right
-                                                                : (haveBar ? bar.right : work.right);
+                                                                : (layout.found ? bar.right : work.right);
     const int center = (anchorLeft + anchorRight) / 2;
     int panelX = center - width / 2;
     int panelY = 0;
     bool belowTaskbar = false;
-    if (g.settings->pillPlacement == 1) {
-        belowTaskbar = barAtTop;
-        panelY = barAtTop ? work.top + (int)std::lround(8 * g.scale)
-                          : work.bottom - height - (int)std::lround(8 * g.scale);
-    } else if (barAtTop) {
+    if (barAtTop) {
         belowTaskbar = true;
-        const int anchorTop = g.pillRect.bottom > g.pillRect.top ? g.pillRect.bottom : work.top;
-        panelY = anchorTop + (int)std::lround(8 * g.scale);
-    } else if (g.pillRect.top > 0 && g.pillRect.top < bar.top) {
+        panelY = work.top + (int)std::lround(8 * g.scale);
+    } else if (g.pillRect.top > 0 && (!layout.found || g.pillRect.top < bar.top)) {
         panelY = g.pillRect.top - height - (int)std::lround(8 * g.scale);
     } else {
         panelY = work.bottom - height - (int)std::lround(8 * g.scale);
@@ -1117,9 +1214,9 @@ LRESULT CALLBACK PillProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 const int dx = p.x - g.dragStartX;
                 if (!g.dragMoved && std::abs(dx) >= GetSystemMetrics(SM_CXDRAG)) g.dragMoved = true;
                 if (g.dragMoved) {
-                    HWND taskbar = FindWindowW(L"Shell_TrayWnd", nullptr);
-                    RECT bar{};
-                    if (taskbar && GetWindowRect(taskbar, &bar) && g.pillRect.right > g.pillRect.left) {
+                    const BarLayout layout = BarForMonitor(MonitorAt(g.settings->monitorIndex));
+                    RECT bar = layout.found ? layout.bar : layout.work;
+                    if (g.pillRect.right > g.pillRect.left) {
                         const int width = g.pillRect.right - g.pillRect.left;
                         const int minLeft = bar.left + (int)std::lround(4 * g.scale);
                         const int maxLeft = bar.right - width - (int)std::lround(4 * g.scale);
@@ -1303,7 +1400,7 @@ bool Init(HINSTANCE inst, Settings* settings, Hooks hooks) {
     GdiplusStartupInput input;
     ULONG_PTR token = 0;
     GdiplusStartup(&token, &input, nullptr);
-
+    dwtext::Init();
     // Three static Inter faces are embedded as resources and registered privately, so the panel
     // looks the same on Windows 10 and 11 without installing anything.
     if (g.fontData[0].Load(inst, 201) && g.fontData[1].Load(inst, 202) && g.fontData[2].Load(inst, 203)) {
@@ -1416,6 +1513,7 @@ void Shutdown() {
     if (HWND bar = FindWindowW(L"Shell_TrayWnd", nullptr))
         RedrawWindow(bar, nullptr, nullptr, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW | RDW_FRAME);
     DwmFlush();
+    dwtext::Shutdown();
 }
 
 void SetCards(std::vector<Card> cards) {
@@ -1448,41 +1546,35 @@ void Tick() {
     // Layered popups cannot be pinned above the Windows 11 taskbar: there is no supported API for
     // that, and Windows raises its own topmost taskbar on screenshots and focus changes. Walk the
     // z-order (read-only) and only re-assert when the taskbar really got above us.
-    HWND taskbar = FindWindowW(L"Shell_TrayWnd", nullptr);
-    if (taskbar) {
-        if (!IsWindow(g.pill)) {
-            g.pill = CreateLayeredWindow(L"WattPillPill", PillProc, L"WattPill");
-            if (!g.pill) return;
+    const BarLayout layout = BarForMonitor(MonitorAt(g.settings->monitorIndex));
+    if (!IsWindow(g.pill)) {
+        g.pill = CreateLayeredWindow(L"WattPillPill", PillProc, L"WattPill");
+        if (!g.pill) return;
+        ShowWindow(g.pill, SW_SHOWNOACTIVATE);
+        RenderPill();
+    }
+    RECT bar = layout.bar;
+    const RECT monRect = layout.monitor;
+    const bool barHidden = layout.found &&
+                           (!IsWindowVisible(layout.taskbar) || bar.right <= bar.left || bar.bottom <= bar.top ||
+                            bar.top >= monRect.bottom - 2 || bar.bottom <= monRect.top + 2);
+    if (barHidden != g.taskbarHidden) {
+        g.taskbarHidden = barHidden;
+        if (barHidden) {
+            ShowWindow(g.pill, SW_HIDE);
+            HidePanelInternal();
+        } else if (g.settings->showPill && !g.fullscreen) {
             ShowWindow(g.pill, SW_SHOWNOACTIVATE);
             RenderPill();
         }
-        RECT bar{};
-        GetWindowRect(taskbar, &bar);
-        RECT monRect{};
-        HMONITOR mon = MonitorFromWindow(taskbar, MONITOR_DEFAULTTONEAREST);
-        MONITORINFO mi{ sizeof(mi) };
-        if (mon && GetMonitorInfoW(mon, &mi)) monRect = mi.rcMonitor;
-        if (monRect.right <= monRect.left || monRect.bottom <= monRect.top)
-            monRect = { 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN) };
-        const bool barHidden = !IsWindowVisible(taskbar) || bar.right <= bar.left || bar.bottom <= bar.top ||
-                               bar.top >= monRect.bottom - 2 || bar.bottom <= monRect.top + 2;
-        if (barHidden != g.taskbarHidden) {
-            g.taskbarHidden = barHidden;
-            if (barHidden) {
-                ShowWindow(g.pill, SW_HIDE);
-                HidePanelInternal();
-            } else if (g.settings->showPill && !g.fullscreen) {
-                ShowWindow(g.pill, SW_SHOWNOACTIVATE);
-                RenderPill();
-            }
-        }
-        if (g.taskbarHidden) return;
-        static RECT lastBar{};
-        if (memcmp(&bar, &lastBar, sizeof(RECT)) != 0) {
-            lastBar = bar;
-            RenderPill();
-            if (g.visible) RenderPanel();
-        }
+    }
+    if (g.taskbarHidden) return;
+    static RECT lastBar{};
+    if (layout.found && memcmp(&bar, &lastBar, sizeof(RECT)) != 0) {
+        lastBar = bar;
+        RenderPill();
+        if (g.visible) RenderPanel();
+    }
         // Ask Windows which window would receive a click on the pill. If none of several points
         // along the strip belongs to us, something (the taskbar after Start or a screenshot, a
         // shell flyout) is above the pill, so put it back.
@@ -1502,7 +1594,6 @@ void Tick() {
                     SetWindowPos(g.panel, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
             }
         }
-    }
 
     RECT panelRect{};
     (void)panelRect;

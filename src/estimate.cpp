@@ -31,40 +31,48 @@ Fit FitTrailing(const std::vector<Sample>& points, bool charging) {
         start--;
     }
 
-    // Report the trailing run even when it is still too short to fit, so the caller can show a
-    // countdown instead of a fixed "15 min" that never moves.
     const size_t n = points.size() - start;
     fit.n = (int)n;
     fit.span = points.back().t - points[start].t;
-    if (n < 4 || fit.span < 15 * 60) return fit;
+    if (n < 3 || fit.span < 10 * 60) return fit;
 
-    // Least squares on hours/percent; the intercept absorbs the level at window start.
-    const double x0 = (double)points[start].t;
-    double sx = 0, sy = 0, sxx = 0, sxy = 0;
+    // Theil-Sen: the median of all pairwise slopes is far less sensitive to a single level jump
+    // (a 5 % firmware step or a reconnection) than a least-squares fit.
+    std::vector<double> slopes;
+    slopes.reserve(n * (n - 1) / 2);
     for (size_t i = start; i < points.size(); i++) {
-        const double x = ((double)points[i].t - x0) / 3600.0;
-        const double y = (double)points[i].percent;
-        sx += x;
-        sy += y;
-        sxx += x * x;
-        sxy += x * y;
+        for (size_t j = i + 1; j < points.size(); j++) {
+            const int64_t dt = points[j].t - points[i].t;
+            if (dt < 5 * 60) continue;
+            const double dp = (double)points[j].percent - (double)points[i].percent;
+            slopes.push_back(dp / ((double)dt / 3600.0));
+        }
     }
-    const double count = (double)n;
-    const double denom = count * sxx - sx * sx;
-    if (std::fabs(denom) < 1e-9) return fit;
+    if (slopes.size() < 3) return fit;
 
+    const size_t mid = slopes.size() / 2;
+    std::nth_element(slopes.begin(), slopes.begin() + mid, slopes.end());
     fit.ok = true;
-    fit.slope = (count * sxy - sx * sy) / denom;
+    fit.slope = slopes[mid];   // points per hour; negative while discharging
     fit.drop = points[start].percent - points.back().percent;
     return fit;
 }
 
 double Confidence(int64_t spanSec, int drop) {
-    if (spanSec >= 2 * 3600 && drop >= 10) return 0.92;
-    if (spanSec >= 3600 && drop >= 5) return 0.8;
-    if (spanSec >= 30 * 60 && drop >= 3) return 0.65;
-    if (spanSec >= 15 * 60) return 0.45;
+    if (spanSec >= 2 * 3600 && drop >= 8) return 0.9;
+    if (spanSec >= 3600 && drop >= 4) return 0.75;
+    if (spanSec >= 30 * 60 && drop >= 2) return 0.6;
+    if (spanSec >= 15 * 60 && drop >= 1) return 0.45;
     return 0.3;
+}
+
+int RoundForecastMinutes(double minutes) {
+    if (!std::isfinite(minutes) || minutes <= 0) return -1;
+    int value;
+    if (minutes >= 120) value = (int)std::lround(minutes / 15.0) * 15;
+    else if (minutes >= 30) value = (int)std::lround(minutes / 10.0) * 10;
+    else value = (int)std::lround(minutes / 5.0) * 5;
+    return std::max(5, value);
 }
 
 } // namespace
@@ -119,9 +127,9 @@ Forecast Estimate(const std::vector<Sample>& history, int percentNow, bool charg
         f.spanSec = fit.span;
         if (fit.ok && fit.slope > 0.5) {
             const double hours = (100.0 - percentNow) / fit.slope;
-            double minutes = hours * 60.0;
+            const int minutes = RoundForecastMinutes(hours * 60.0);
             if (minutes > 0 && minutes < 8 * 60) {
-                f.minutes = (int)std::lround(minutes);
+                f.minutes = minutes;
                 f.pctPerHour = -fit.slope;
                 f.confidence = Confidence(fit.span, -fit.drop);
             }
@@ -143,14 +151,14 @@ Forecast Estimate(const std::vector<Sample>& history, int percentNow, bool charg
     f.spanSec = fit.span;
     if (!fit.ok) {
         f.state = ForecastState::Learning;
-        f.needSec = (int)std::max<int64_t>(0, 15 * 60 - fit.span);
+        f.needSec = (int)std::max<int64_t>(5 * 60, 10 * 60 - fit.span);
         return f;
     }
 
     f.pctPerHour = -fit.slope;
     // A device that idles at a fraction of a percent per hour would produce a fantasy
     // forecast of several days. Show "steady" until the drain is actually measurable.
-    if (f.pctPerHour < 0.8) {
+    if (f.pctPerHour < 0.5 || fit.drop < 1) {
         f.state = ForecastState::Flat;
         return f;
     }
@@ -165,7 +173,7 @@ Forecast Estimate(const std::vector<Sample>& history, int percentNow, bool charg
         f.state = ForecastState::Flat;
         return f;
     }
-    f.minutes = (int)std::lround(minutes);
+    f.minutes = RoundForecastMinutes(minutes);
     f.confidence = Confidence(fit.span, std::max(0, fit.drop));
     f.state = f.confidence >= 0.6 ? ForecastState::Ready : ForecastState::LowConfidence;
     return f;
