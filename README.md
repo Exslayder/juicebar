@@ -20,20 +20,6 @@ second click on the pill). Right-click opens the settings panel.
 > **Renamed from JuiceBar.** WattPill is the new name. Settings and history from JuiceBar 1.x are
 > migrated on first launch; if you have JuiceBar installed, uninstall it after installing WattPill.
 
-## What's new in 2.1
-
-- **A new pill**, rebuilt to sit naturally on the Windows 11 taskbar: inset height, Fluent glyphs,
-  mini battery capsule, green charging, red low battery, and a hover hint.
-- **A settings panel** instead of a menu: toggles and segmented options for placement, style,
-  background, fullscreen, monitor, language, autostart; Refresh and Exit at the bottom. No Save —
-  everything applies immediately.
-- **Per-device visibility**: the eye on each card hides a device from the pill and leaves a
-  desaturated row in the panel.
-- **Any monitor**: move the widget and its panel to the primary or an additional display.
-- **Crisper digits** via DirectWrite (the WPF rasterizer) while staying a ~1.9 MB native exe.
-- **A more honest forecast**: uninterrupted discharge runs from up to 30 days, rounded to minutes,
-  hours or days; "not enough data" instead of a made-up number.
-
 ## Why another battery monitor
 
 Most tools only repeat a percentage. WattPill answers the question you actually have: *"how long
