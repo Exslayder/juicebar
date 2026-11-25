@@ -15,10 +15,24 @@ Windows taskbar, without vendor software.
 A small pill floats above the clock (or sits on the taskbar, if you prefer) and shows the real level
 reported by each device. Click it and a compact panel opens with the device name, the estimated time
 left, the percentage and a battery glyph. It closes 200 ms after the pointer leaves it (or on a
-second click on the pill).
+second click on the pill). Right-click opens the settings panel.
 
 > **Renamed from JuiceBar.** WattPill is the new name. Settings and history from JuiceBar 1.x are
 > migrated on first launch; if you have JuiceBar installed, uninstall it after installing WattPill.
+
+## What's new in 2.1
+
+- **A new pill**, rebuilt to sit naturally on the Windows 11 taskbar: inset height, Fluent glyphs,
+  mini battery capsule, green charging, red low battery, and a hover hint.
+- **A settings panel** instead of a menu: toggles and segmented options for placement, style,
+  background, fullscreen, monitor, language, autostart; Refresh and Exit at the bottom. No Save —
+  everything applies immediately.
+- **Per-device visibility**: the eye on each card hides a device from the pill and leaves a
+  desaturated row in the panel.
+- **Any monitor**: move the widget and its panel to the primary or an additional display.
+- **Crisper digits** via DirectWrite (the WPF rasterizer) while staying a ~1.9 MB native exe.
+- **A more honest forecast**: uninterrupted discharge runs from up to 30 days, rounded to minutes,
+  hours or days; "not enough data" instead of a made-up number.
 
 ## Why another battery monitor
 
@@ -29,39 +43,64 @@ measurement, and it is labelled while the data is still thin.
 - **Real device percentages.** The Razer Barracuda X reports its own 0–100 % over the 2.4 GHz
   receiver (customer data `0x21`), not a voltage guess. SteelSeries mice report their level in
   fixed 5 % steps, exactly like the mouse firmware does.
-- **Remaining time at a glance.** A local regression over the observed discharge (up to 6 h) gives
-  `≈ 3 h 20 min`. Nothing is uploaded and no account is needed.
-- **All native, no Chromium.** ~1.8 MB exe: the pill, the panel, device polling and history are
-  plain Win32 + GDI+. No WebView2, no Electron, no background Chromium processes. Idle CPU is
-  0 ms/s and the working set is under 25 MB.
+- **Remaining time at a glance.** A local estimate over uninterrupted discharge runs from up to
+  30 days gives `≈ 3 ч` or `≈ 3 дня`; when there is not enough data it says so instead of inventing a
+  number. Nothing is uploaded and no account is needed.
+- **All native, no Chromium.** ~1.9 MB exe: the pill, the panel, device polling and history are
+  plain Win32; the panel uses GDI+, the pill's digits use DirectWrite (the same rasterizer as WPF).
+  No WebView2, no Electron, no background Chromium processes. Idle CPU is 0 ms/s and the working
+  set is under 25 MB.
 - **Sits on the taskbar, not over it.** The pill is inset into the taskbar, centered vertically, and
-  uses the same height and hover weight as the Explorer tray buttons. *Placement → On the taskbar*
-  docks it left of the tray; *Above the clock* floats it over the clock. Shift-drag slides it along
-  the bar; Ctrl-drag (or right-click → *Move widget*) moves it freely anywhere on the monitor;
-  *Reset position* puts it back.
+  uses the same height and hover weight as the Explorer tray buttons. *Settings → Placement → On the
+  taskbar* docks it left of the tray; *Above the clock* floats it over the clock. Shift-drag slides
+  it along the bar; Ctrl-drag (or *Move widget*) moves it freely anywhere on the monitor; *Reset
+  position* puts it back.
 - **A panel that behaves like a shell flyout.** It opens centered on the pill with a short slide and
   fade, keeps WattPill's own look (Inter, grouped cards, violet forecast accent) and contains no
-  chrome; settings live on the pill's right-click menu. Every card has a small eye button: hide a
-  device from the pill and its row stays in the panel, desaturated, so it can be brought back.
+  chrome. Every card has a small eye button: hide a device from the pill and its row stays in the
+  panel, desaturated, so it can be brought back.
+- **A settings panel, not a menu.** Right-click the pill: the WattPill wordmark, a card of toggle
+  switches and segmented options, and Refresh/Exit buttons. Everything applies immediately; the
+  panel closes when the pointer leaves.
 - **Color that means something.** Charging is green on the pill and in the panel; at 20 % or below
   the same elements (glyph, capsule/battery mark, percentage and status) turn red.
 - **A pill that matches the taskbar.** Full (glyph, mini battery capsule, percentage), Compact
   (glyph and percentage) or Minimal (percentage only); optional Fluent background plate. While
   charging, the bolt and the percentage turn green.
-- **Any monitor.** *Monitor* in the menu moves the pill and panel to the primary or an additional
+- **Any monitor.** *Settings → Monitor* moves the pill and panel to the primary or an additional
   display, using that display's own taskbar.
-- **Starts with Windows.** Enabled on the first run; a checkbox in the right-click menu turns it
-  off again (a single `HKCU\…\Run` value, no service, no admin rights).
-- **Follows Windows.** Light/dark theme comes from the taskbar and updates live; 100–200 % DPI
-  aware.
+- **Starts with Windows.** *Settings → Start with Windows* toggles a single `HKCU\…\Run` value, no
+  service and no admin rights.
+- **Follows Windows.** The panel follows the app theme, the pill follows the taskbar theme, live;
+  100–200 % DPI aware.
 - **English and Russian UI.** A Russian Windows starts in Russian, everything else in English;
-  right-click → Language switches and saves the choice. Menus, panel labels and duration strings
-  are translated.
+  *Settings → Language* switches and saves the choice. Menus, panel labels and duration strings are
+  translated.
+
+## Screenshots
+
+### Settings panel
+
+Right-click the pill to open it; toggles and segments apply immediately.
+
+![WattPill settings](docs/settings.png)
+
+### Hide a device from the pill
+
+The eye in each card removes the device from the taskbar and leaves a desaturated row in the panel.
+
+![Hidden device](docs/eye.png)
+
+### Pill and hover hint
+
+`Shift` moves it along the taskbar, `Ctrl` moves it freely; the hint appears after a short hover.
+
+![Pill and hint](docs/pill.png)
 
 ## Install
 
-Download `WattPill-2.0.0-setup.exe` from the latest release and run it. The installer is per-user — no
-administrator rights, no UAC prompt. By default it installs into
+Download `WattPill-2.1.0-setup.exe` from the latest release and run it. The installer is per-user —
+no administrator rights, no UAC prompt. By default it installs into
 `%LOCALAPPDATA%\Programs\WattPill` and adds a Start menu shortcut; the wizard also lets you pick
 another folder (for example `D:\Apps\WattPill`).
 
@@ -74,14 +113,12 @@ Windows 10) or the uninstaller in the install folder. Your settings and history 
 
 ## Placement
 
-The pill floats above the clock by default. Right-click → Placement → *On the taskbar* puts it
-left of the tray; *Above the clock* brings it back. Both are shown below.
+The pill floats above the clock by default. Right-click → *Settings* → *Placement* → *On the
+taskbar* puts it left of the tray; *Above the clock* brings it back.
 
-Shift-drag the pill to move it along the taskbar, hold Ctrl (or enable *Placement → Move widget*) to
-drag it freely anywhere on the monitor. *Placement → Reset position* returns it to the default spot;
-the position is saved in `settings.ini` (`pill_free`, `pill_free_x/y`, or `pill_manual` + `pill_offset`).
-
-![Pill placement](docs/placement.png)
+Shift-drag the pill to move it along the taskbar, hold Ctrl (or enable *Move widget*) to drag it
+freely anywhere on the monitor. *Reset position* returns it to the default spot; the position is
+saved in `settings.ini` (`pill_free`, `pill_free_x/y`, or `pill_manual` + `pill_offset`).
 
 ## Supported devices
 
@@ -198,7 +235,7 @@ project (no system installation):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\toolchain.ps1
-powershell -ExecutionPolicy Bypass -File build.ps1 -Version 2.0.0
+powershell -ExecutionPolicy Bypass -File build.ps1 -Version 2.1.0
 powershell -ExecutionPolicy Bypass -File test.ps1
 ```
 
@@ -213,7 +250,7 @@ MinGW archive before extracting it.
 To build the installer you need [Inno Setup 6+](https://jrsoftware.org/isinfo.php):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1 -Version 2.0.0
+powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1 -Version 2.1.0
 ```
 
 The result is `dist\WattPill-<version>-setup.exe`.
@@ -229,7 +266,7 @@ The result is `dist\WattPill-<version>-setup.exe`.
 ## Limitations
 
 - The pill follows a horizontal taskbar; vertical taskbars are not supported. It floats above the
-  clock by default; *Placement → On the taskbar* puts it left of the tray.
+  clock by default; *Settings → Placement → On the taskbar* puts it left of the tray.
 - Windows has no supported API to pin a layered popup above its own topmost taskbar. After a
   screenshot or a taskbar focus change the shell can raise itself above the pill; a read-only
   z-order check once per second re-asserts the pill only when that actually happened (zero work

@@ -1,35 +1,38 @@
-# WattPill 2.0.0
+# WattPill 2.1.0
 
 Battery level **and remaining time** for wireless mice, headsets and controllers — right on the
 Windows taskbar, without vendor software.
 
-## Renamed
+![WattPill device panel and settings](https://raw.githubusercontent.com/Exslayder/wattpill/main/docs/screenshot.png)
 
-WattPill is the new name of JuiceBar. This is a rename release: the functionality is the same as
-JuiceBar 1.0.5.
+## Highlights
 
-## What changed
+- **New taskbar pill.** Rebuilt to sit naturally on the Windows 11 taskbar: inset height, Fluent
+  glyphs, a 16×9.5 battery capsule, green charging, red low-battery highlighting and a small hover
+  hint (`Shift` moves along the bar, `Ctrl` moves freely).
+- **Settings panel instead of a menu.** Right-click the pill for the WattPill wordmark, one card of
+  toggles and segmented options, and Refresh/Exit buttons. Everything applies immediately; there is
+  no Save button, and the panel closes when the pointer leaves.
+- **Per-device eye.** Hide a device from the pill; its card stays in the panel, desaturated, with a
+  slashed eye to bring it back.
+- **Any monitor.** Move the widget and its panel to the primary or an additional display, using that
+  display's own taskbar.
+- **Crisper digits.** The pill's percentages and glyphs are rendered with DirectWrite — the same
+  grayscale rasterizer WPF uses — while the app stays a ~1.9 MB native Win32 exe.
+- **More honest remaining time.** The estimate uses uninterrupted discharge runs from up to 30 days,
+  prefers the last 12 hours, falls back to the 7-day median, and rounds to minutes, hours or days.
+  When there is not enough data it says so instead of inventing a number.
 
-- The app, executable, installer, window classes, autostart value and data folders use the new name.
-- Settings and history from JuiceBar 1.x are copied automatically on first launch to
-  `%APPDATA%\WattPill` and `%LOCALAPPDATA%\WattPill`. The old JuiceBar autostart value is removed.
-- New installer identity and install folder. If you have JuiceBar installed, install WattPill and
-  then uninstall JuiceBar; the old settings and history are already migrated.
+## Fixes
 
-## What the app does
-
-- Native Win32 + GDI+ taskbar pill with the real device percentage and an estimated remaining time.
-- Click the pill for a compact panel with device cards; it closes 200 ms after the pointer leaves.
-- Device drivers for SteelSeries Aerox/Prime, Razer Barracuda X, HyperX Cloud/Stinger, Sony PULSE 3D,
-  Xbox controllers and Bluetooth devices whose battery Windows exposes.
-- Placement above the clock (default) or on the taskbar left of the tray.
-- English and Russian UI; the first run follows Windows (Russian Windows → Russian, everything else
-  English). The choice is saved in `settings.ini`.
-- No telemetry, no account, no WebView2/Electron; history stays local.
+- Fullscreen hiding now follows the foreground window on the widget's own monitor, so a maximized
+  document no longer hides the pill and a fullscreen app on another display no longer affects it.
+- The pill is repainted and re-anchored when fullscreen ends.
+- Devices that stop answering are removed instead of being shown as disconnected.
 
 ## Install
 
-Download `WattPill-2.0.0-setup.exe` and run it. Per-user installer: no administrator rights, no UAC
+Download `WattPill-2.1.0-setup.exe` and run it. Per-user installer: no administrator rights, no UAC
 prompt. By default it installs into `%LOCALAPPDATA%\Programs\WattPill` (the wizard lets you choose
 another folder), adds a Start menu shortcut and registers an uninstaller.
 
@@ -42,11 +45,11 @@ Windows 10 1903+ or Windows 11, x64. No runtime to install.
 
 ## Notes
 
-- The pill floats above the clock by default (*Placement → On the taskbar* puts it left of the tray)
-  on a horizontal taskbar.
+- Left-click the pill for the device panel; right-click for settings. The pill follows a horizontal
+  taskbar.
 - While the Start menu is open, Windows keeps its own shell window above every third-party overlay;
   the pill becomes clickable again as soon as the menu closes.
 - Settings: `%APPDATA%\WattPill\settings.ini`; history: `%LOCALAPPDATA%\WattPill\history.tsv`.
   Uninstalling keeps them; delete the folders to remove everything.
-- Winget package `WattPill.WattPill` is being submitted separately; the GitHub installer above is
+- The Winget package `WattPill.WattPill` is being updated to 2.1.0; the GitHub installer above is
   the primary download.

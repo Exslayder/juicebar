@@ -6,6 +6,8 @@ All notable changes to WattPill are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.1.0] — 2026-11-25
+
 ### Added
 
 - PowerVision-style taskbar anchoring: the pill is inset and centered in the taskbar, follows its
