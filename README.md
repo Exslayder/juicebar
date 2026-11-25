@@ -77,26 +77,6 @@ measurement, and it is labelled while the data is still thin.
   *Settings → Language* switches and saves the choice. Menus, panel labels and duration strings are
   translated.
 
-## Screenshots
-
-### Settings panel
-
-Right-click the pill to open it; toggles and segments apply immediately.
-
-![WattPill settings](docs/settings.png)
-
-### Hide a device from the pill
-
-The eye in each card removes the device from the taskbar and leaves a desaturated row in the panel.
-
-![Hidden device](docs/eye.png)
-
-### Pill and hover hint
-
-`Shift` moves it along the taskbar, `Ctrl` moves it freely; the hint appears after a short hover.
-
-![Pill and hint](docs/pill.png)
-
 ## Install
 
 Download `WattPill-2.1.0-setup.exe` from the latest release and run it. The installer is per-user —
