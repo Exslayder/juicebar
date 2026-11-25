@@ -121,6 +121,9 @@ the Windows 11 taskbar are swallowed by the shell's XAML island. Instead the app
 - reacts immediately to `EVENT_SYSTEM_FOREGROUND` through a WinEvent hook;
 - re-anchors on `TaskbarCreated` (Explorer restart) and `WM_DISPLAYCHANGE`;
 - hides the pill while the taskbar is auto-hidden or a fullscreen app is in front (optional).
+  Fullscreen means the foreground root window is on the widget's own monitor, is visible and
+  uncloaked, is not a shell window, and its window rectangle covers that monitor — the same rule
+  PowerVision uses.
 
 In steady state the guard makes no z-order calls and no repaints.
 

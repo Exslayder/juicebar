@@ -39,6 +39,14 @@ All notable changes to WattPill are documented here. The format follows
   window, no "calibration countdown", rounded remaining time and a `via · …` status prefix.
 - Polling defaults to 15 seconds (PowerVision polls every 10 seconds) for fresher percentages.
 
+### Fixed
+
+- Fullscreen hiding now uses PowerVision's monitor-scoped rule: the foreground window must cover the
+  widget's own monitor, be visible and uncloaked, and not be a shell window. This removes the
+  QUNS/primary-taskbar heuristics that could hide the pill for a maximized window, keep it visible
+  during a fullscreen app on the wrong monitor, or leave it hidden after exit. The pill repaints and
+  re-anchors when it comes back.
+
 ## [2.0.0] — 2026-11-24
 
 ### Changed

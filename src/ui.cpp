@@ -1000,13 +1000,10 @@ void CALLBACK OnForegroundEvent(HWINEVENTHOOK, DWORD, HWND, LONG, LONG, DWORD, D
 // itself: a borderless game covers the monitor with its client area, while a normal maximized
 // document has a caption and its client starts below the title bar, so a covering window rect
 // alone is not enough.
-bool CoversMonitor(const RECT& rect, const RECT& monitor) {
-    const LONG tolerance = 2;
-    return rect.left <= monitor.left + tolerance && rect.top <= monitor.top + tolerance &&
-           rect.right >= monitor.right - tolerance && rect.bottom >= monitor.bottom - tolerance;
-}
-
-bool ForegroundCoversTaskbar() {
+// PowerVision's rule, reproduced exactly: the foreground root window must be on the same monitor
+// as the widget, be visible and uncloaked, and its window rectangle must cover that monitor.
+bool ForegroundCoversMonitor(HMONITOR target) {
+    if (!target) return false;
     HWND foreground = GetForegroundWindow();
     if (!foreground) return false;
     HWND root = GetAncestor(foreground, GA_ROOT);
@@ -1014,64 +1011,34 @@ bool ForegroundCoversTaskbar() {
 
     DWORD pid = 0;
     GetWindowThreadProcessId(root, &pid);
-    if (pid == GetCurrentProcessId()) return false;
+    if (pid == GetCurrentProcessId()) return false;   // our own pill/panel
     if (!IsWindowVisible(root) || IsIconic(root)) return false;
-
-    wchar_t cls[64] = {};
-    GetClassNameW(root, cls, 64);
-    if (!_wcsicmp(cls, L"Progman") || !_wcsicmp(cls, L"WorkerW") ||
-        !_wcsicmp(cls, L"Shell_TrayWnd") || !_wcsicmp(cls, L"Shell_SecondaryTrayWnd"))
-        return false;   // the desktop or the taskbar itself are never a game
 
     DWORD cloaked = 0;
     if (SUCCEEDED(DwmGetWindowAttribute(root, DWMWA_CLOAKED, &cloaked, sizeof(cloaked))) && cloaked)
-        return false;   // a cloaked UWP window is not on screen
+        return false;
 
-    HWND taskbar = FindWindowW(L"Shell_TrayWnd", nullptr);
-    if (!taskbar) return false;
-    HMONITOR monitor = MonitorFromWindow(taskbar, MONITOR_DEFAULTTONEAREST);
-    MONITORINFO info{ sizeof(info) };
-    if (!GetMonitorInfoW(monitor, &info)) return false;
-    const RECT& screen = info.rcMonitor;
+    wchar_t cls[128] = {};
+    GetClassNameW(root, cls, 128);
+    if (!_wcsicmp(cls, L"Shell_TrayWnd") || !_wcsicmp(cls, L"Shell_SecondaryTrayWnd") ||
+        !_wcsicmp(cls, L"Progman") || !_wcsicmp(cls, L"WorkerW") ||
+        !_wcsicmp(cls, L"Windows.UI.Core.CoreWindow") || !_wcsicmp(cls, L"ForegroundStaging"))
+        return false;   // the shell itself is never a fullscreen app
+
+    if (MonitorFromWindow(root, MONITOR_DEFAULTTONEAREST) != target) return false;
 
     RECT window{};
     if (!GetWindowRect(root, &window)) return false;
-
-    RECT client{};
-    POINT origin{ 0, 0 };
-    RECT clientScreen{};
-    const bool haveClient = GetClientRect(root, &client) && ClientToScreen(root, &origin);
-    if (haveClient) {
-        clientScreen = { origin.x, origin.y, origin.x + client.right, origin.y + client.bottom };
-        if (CoversMonitor(clientScreen, screen)) return true;
-    }
-
-    if (!CoversMonitor(window, screen)) return false;
-    // Do not reject IsZoomed windows outright: WoW's "Windowed (Fullscreen)" is a maximized
-    // borderless window. The client-area check above and the missing caption below separate it
-    // from an ordinary maximized document.
-    const LONG style = GetWindowLongW(root, GWL_STYLE);
-    if ((style & WS_CAPTION) != WS_CAPTION) return true;   // borderless
-    if (!IsZoomed(root)) return true;                       // manually sized to the monitor
-    // A maximized window with a caption is normally a document. Accept it only when the client
-    // area really starts at the top of the DWM frame (no visible title bar).
-    RECT frame{};
-    if (haveClient &&
-        SUCCEEDED(DwmGetWindowAttribute(root, DWMWA_EXTENDED_FRAME_BOUNDS, &frame, sizeof(frame))) &&
-        clientScreen.top - frame.top <= 2)
-        return true;
-    return false;
+    MONITORINFO info{ sizeof(info) };
+    if (!GetMonitorInfoW(target, &info)) return false;
+    const RECT& screen = info.rcMonitor;
+    return window.left <= screen.left + 1 && window.top <= screen.top + 1 &&
+           window.right >= screen.right - 1 && window.bottom >= screen.bottom - 1;
 }
 
 bool FullscreenApp() {
-    QUERY_USER_NOTIFICATION_STATE state{};
-    if (SUCCEEDED(SHQueryUserNotificationState(&state))) {
-        // QUNS_BUSY is unreliable on Windows 10 (it also fires for ordinary maximized windows), so
-        // only the two unambiguous states hide the pill; the geometric check covers borderless
-        // fullscreen on both Windows 10 and 11.
-        if (state == QUNS_RUNNING_D3D_FULL_SCREEN || state == QUNS_PRESENTATION_MODE) return true;
-    }
-    return ForegroundCoversTaskbar();
+    if (!g.settings) return false;
+    return ForegroundCoversMonitor(MonitorAt(g.settings->monitorIndex));
 }
 
 std::wstring FullscreenReportImpl() {
@@ -1120,7 +1087,8 @@ std::wstring FullscreenReportImpl() {
     out += Fmt(L"monitor=%ld,%ld,%ld,%ld taskbar=%ld,%ld,%ld,%ld\n",
                monRect.left, monRect.top, monRect.right, monRect.bottom,
                barRect.left, barRect.top, barRect.right, barRect.bottom);
-    out += Fmt(L"covers=%d fullscreen=%d\n", ForegroundCoversTaskbar() ? 1 : 0,
+    out += Fmt(L"covers=%d fullscreen=%d\n",
+               ForegroundCoversMonitor(MonitorAt(g.settings->monitorIndex)) ? 1 : 0,
                FullscreenApp() ? 1 : 0);
     return out;
 }
@@ -1494,8 +1462,13 @@ void Tick() {
     const bool fs = g.settings->hideFullscreen && FullscreenApp();
     if (fs != g.fullscreen) {
         g.fullscreen = fs;
-        ShowWindow(g.pill, fs ? SW_HIDE : SW_SHOWNOACTIVATE);
-        if (fs) HidePanelInternal();
+        if (fs) {
+            ShowWindow(g.pill, SW_HIDE);
+            HidePanelInternal();
+        } else if (g.settings->showPill && !g.taskbarHidden) {
+            ShowWindow(g.pill, SW_SHOWNOACTIVATE);
+            RenderPill();
+        }
     }
     if (g.fullscreen) return;
 
