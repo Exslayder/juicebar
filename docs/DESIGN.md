@@ -29,8 +29,7 @@ are removed rather than shown as disconnected.
 
 The panel keeps WattPill's own visual language: a 440 DIP card with a 20 px radius, the neutral
 surface ladder (`#202020` panel, `#2B2B2B` cards), Inter for all text, 16 px card radius and the
-violet forecast accent. It opens from the pill or the gear, centered on the widget, with a short
-slide and fade.
+violet forecast accent. It opens from the pill, centered on the widget, with a short slide and fade.
 
 - The panel is pure content: no header, no close button, no gear. Settings open from the pill's
   right-click menu, so the flyout stays quiet.
@@ -69,8 +68,8 @@ DPI from 100 % to 200 % is handled by scaling every metric from the system DPI.
 
 The right-click menu on the pill is the only settings surface:
 
-- Refresh, Open panel
-- Placement: above the clock, on the taskbar, Move widget, Reset position
+- Refresh
+- Placement: above the clock, on the taskbar, Move widget (free drag), Reset position
 - Pill style: detailed, compact, percent only; pill background
 - Hide in fullscreen
 - Monitor: *Основной* and *Дополнительный* (adds a number when there are several)
@@ -105,8 +104,12 @@ taskbar and notification-area rectangles on every guard tick:
 
 - **On the taskbar** — vertically centered inside the bar, left of the tray with an 8 DIP gap.
 - **Above the clock** — right-aligned with the tray, 4 DIP above the bar.
-- **Manual** — Shift-drag (or *Move widget*) records a horizontal offset from the taskbar's right
-  edge; it is clamped so the pill can never leave the bar. *Reset position* returns to the default.
+- **Manual** — Shift-drag records a horizontal offset from the taskbar's right edge; it is clamped so
+  the pill can never leave the bar. *Move widget* makes a plain drag move the pill freely anywhere
+  on the monitor (X and Y), and the position is stored relative to that monitor. *Reset position*
+  returns to the default.
+
+Hovering the pill shows a small rounded hint, *Hold Shift to move*, above it.
 
 The panel follows the same anchor, stays inside the monitor's work area and re-centers when the
 pill moves.

@@ -100,47 +100,58 @@ Windows has no number to read.
 
 - A percentage is only shown when the device actually reports one (`0…100`). Out-of-range values
   are rejected instead of clamped silently.
-- A device that stops answering keeps its last value, dimmed, with "no answer" — the last sample is
-  never presented as fresh. A Bluetooth device that disconnects disappears after five minutes; a
-  receiver that stays plugged in keeps its headset on screen as "off" (dimmed) with the last level.
+- A device that stops answering is removed from the pill and the panel as soon as it disappears from
+  the poll. A receiver that stays plugged in keeps its headset on screen as "off" (dimmed) with the
+  last level only while the receiver itself is still present.
 - SteelSeries reports steps, so 45 % means "45 %"; Razer reports its own number; Xbox levels are
   coarse by nature and shown as such.
 - Verified twice against the reference protocol reader (BatteryHub) with both tools running at the
   same moment: `75 % / 49 %` and `45 % / 49 %` for the Aerox 3 Wireless and Barracuda X — identical.
-- Forecasts are suppressed when the drain is too small to measure (`< 0.8 %/h`) and capped at
-  "more than a day", so an idle headset never reports a fantasy "4 days left".
+- Forecasts are only shown when the device has actually lost charge in an uninterrupted discharge
+  run; otherwise the panel says "Not enough data yet" instead of inventing a number.
 
 ## Remaining time
 
-The forecast is a least-squares fit over the last discharge samples (up to 6 h; gaps and charging
-sessions break the window).
+The forecast is built from the discharge history, split into uninterrupted runs (a charging session,
+a PC reboot or a gap longer than 30 minutes starts a new run). It uses up to 30 days of history:
+
+- a fresh run from the last 12 hours is preferred when it lost at least 2 %;
+- otherwise the median rate of the last 7 days is used;
+- the result is rounded (minutes up to an hour, then hours, then whole days) and always shown with
+  `≈`, because usage changes the real runtime.
 
 | State | Panel text |
 |---|---|
-| less than 15 min of data | `Calibrating · 12 min` |
-| steady level | `Drain is steady` |
-| forecast | `≈ 3 h 20 min` |
-| charging | `Charging · 1 h 05 min` when the charge rate is known |
+| no measurable drop yet | `2.4 GHz · Мало данных для прогноза` |
+| forecast, hours | `2.4 GHz · ≈ 12 ч` |
+| forecast, days | `2.4 GHz · ≈ 3 дня` |
+| charging | `2.4 GHz · Заряжается · до полного 45 мин` when the charge rate is known |
 
 ## Polling
 
-- Devices are polled once every **60 seconds** by a background thread. The Sony PULSE 3D is the
+- Devices are polled once every **15 seconds** by a background thread. The Sony PULSE 3D is the
   exception: its dongle only pushes reports, so a second thread blocks on them and wakes the poller
   when something changes.
 - An extra read happens immediately on start, on a device connect/disconnect (`WM_DEVICECHANGE`),
   after resume from sleep, and from *Refresh* in the menu.
 - History keeps at most one sample per device per minute and is written to disk every 5 minutes
-  and on exit, so faster polling would not add accuracy — only radio traffic and CPU.
+  and on exit.
 
 ## Menu
 
 Right-click the pill:
 
 - **Refresh** — poll the devices right now.
+- **Placement** — *Above the clock* (default) or *On the taskbar*; *Move widget* (drag the pill
+  freely anywhere on the monitor) and *Reset position*.
+- **Pill style** — detailed, compact or percent only; optional Fluent background plate.
+- **Hide in fullscreen**.
+- **Monitor** — *Основной* or *Дополнительный* (with a number when there are several).
 - **Start with Windows** — checked by default; toggles the `HKCU\…\Run` entry.
-- **Placement** — *Above the clock* (default) or *On the taskbar*.
 - **Language** — *Auto* (the Windows language), *Русский* or *English*.
 - **Exit**.
+
+Hovering the pill shows a small hint: *Hold Shift to move*.
 
 ## Languages
 

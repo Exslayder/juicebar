@@ -133,6 +133,9 @@ Settings LoadSettings(const std::wstring& file) {
         else if (key == L"pill_offset") s.pillOffset = ToInt(value, 12);
         else if (key == L"pill_unlocked") s.pillUnlocked = ToInt(value, 0) != 0;
         else if (key == L"pill_mode") s.pillMode = ToInt(value, 0);
+        else if (key == L"pill_free") s.pillFree = ToInt(value, 0) != 0;
+        else if (key == L"pill_free_x") s.pillFreeX = ToInt(value, 0);
+        else if (key == L"pill_free_y") s.pillFreeY = ToInt(value, 0);
         else if (key == L"pill_background") s.pillBackground = ToInt(value, 0) != 0;
         else if (key == L"hide_fullscreen") s.hideFullscreen = ToInt(value, 1) != 0;
         else if (key == L"monitor") s.monitorIndex = ToInt(value, 0);
@@ -146,6 +149,8 @@ Settings LoadSettings(const std::wstring& file) {
     s.pillOffset = std::clamp(s.pillOffset, 0, 4000);
     s.pillMode = std::clamp(s.pillMode, 0, 2);
     s.monitorIndex = std::clamp(s.monitorIndex, 0, 15);
+    s.pillFreeX = std::clamp(s.pillFreeX, -10000, 10000);
+    s.pillFreeY = std::clamp(s.pillFreeY, -10000, 10000);
     return s;
 }
 
@@ -162,6 +167,9 @@ bool SaveSettings(const std::wstring& file, const Settings& s) {
     text += "pill_offset=" + std::to_string(std::clamp(s.pillOffset, 0, 4000)) + "\n";
     text += std::string("pill_unlocked=") + (s.pillUnlocked ? "1" : "0") + "\n";
     text += "pill_mode=" + std::to_string(std::clamp(s.pillMode, 0, 2)) + "\n";
+    text += std::string("pill_free=") + (s.pillFree ? "1" : "0") + "\n";
+    text += "pill_free_x=" + std::to_string(std::clamp(s.pillFreeX, -10000, 10000)) + "\n";
+    text += "pill_free_y=" + std::to_string(std::clamp(s.pillFreeY, -10000, 10000)) + "\n";
     text += std::string("pill_background=") + (s.pillBackground ? "1" : "0") + "\n";
     text += std::string("hide_fullscreen=") + (s.hideFullscreen ? "1" : "0") + "\n";
     text += "monitor=" + std::to_string(std::clamp(s.monitorIndex, 0, 15)) + "\n";

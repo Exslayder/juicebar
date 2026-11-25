@@ -27,6 +27,7 @@ constexpr UINT WM_APP_REFRESH_UI = WM_APP + 40;
 
 constexpr int kPanelTimerHide = 2;
 constexpr int kPanelTimerAnim = 3;
+constexpr int kPillTipTimer = 4;
 
 struct Theme {
     // Flyout: WattPill's own neutral surface ladder with the violet forecast accent.
@@ -205,9 +206,16 @@ struct State {
 
     bool dragArmed = false;
     bool dragMoved = false;
+    bool dragFree = false;
     int dragStartX = 0;
+    int dragStartY = 0;
     int dragStartLeft = 0;
-    int dragStartRight = 0;
+    int dragStartTop = 0;
+
+    HWND tip = nullptr;
+    bool tipVisible = false;
+    int tipW = 0;
+    int tipH = 0;
 
     HWINEVENTHOOK winEventHook = nullptr;
     UINT taskbarCreatedMessage = 0;
@@ -344,20 +352,29 @@ bool IsLow(const Card& card) {
     return card.reading.connected && card.reading.percent >= 0 && card.reading.percent <= 20 && !card.reading.charging;
 }
 
-Color BatteryTint(const Card& card) {
-    if (card.reading.charging) return g.theme.charging;
-    if (card.reading.connected && card.reading.percent >= 0) {
-        if (card.reading.percent <= 20) return g.theme.red;
-        if (card.reading.percent <= 45) return g.theme.amber;
-    }
-    return g.theme.green;
-}
-
 Color PercentColor(const Card& card) {
     if (IsLow(card)) return g.theme.red;
     if (card.reading.charging) return g.theme.charging;
     if (card.reading.asleep || !card.reading.connected) return g.theme.faint;
     return g.theme.text;
+}
+
+std::wstring FormatForecast(int minutes) {
+    if (minutes < 0) return L"";
+    if (minutes >= 48 * 60) {
+        int days = (int)std::lround(minutes / (24.0 * 60.0));
+        days = std::max(2, days);
+        if (RussianUi()) {
+            const int mod100 = days % 100, mod10 = days % 10;
+            const wchar_t* word = (mod100 >= 11 && mod100 <= 14) ? L"дней"
+                                  : mod10 == 1 ? L"день"
+                                  : (mod10 >= 2 && mod10 <= 4) ? L"дня"
+                                  : L"дней";
+            return Fmt(L"%d %s", days, word);
+        }
+        return Fmt(L"%d day%s", days, days == 1 ? L"" : L"s");
+    }
+    return FormatSpan(minutes);
 }
 
 std::wstring StatusLine(const Card& card) {
@@ -379,11 +396,11 @@ std::wstring StatusLine(const Card& card) {
     switch (f.state) {
         case ForecastState::Ready:
         case ForecastState::LowConfidence:
-            return prefix + L"≈ " + FormatSpan(f.minutes);
+            return prefix + L"≈ " + FormatForecast(f.minutes);
         case ForecastState::Flat:
             return prefix + Tr(L"Расход стабилен", L"Drain is steady");
         case ForecastState::Learning:
-            return prefix + Tr(L"Калибровка", L"Calibrating");
+            return prefix + Tr(L"Мало данных для прогноза", L"Not enough data yet");
         case ForecastState::NoData:
         default:
             return prefix + Tr(L"Ожидание данных", L"Waiting for data");
@@ -508,6 +525,52 @@ BarLayout BarForMonitor(HMONITOR mon) {
     return layout;
 }
 
+// ------------------------------------------------------------------ hover hint
+
+void HideTip() {
+    if (g.tip && g.tipVisible) ShowWindow(g.tip, SW_HIDE);
+    g.tipVisible = false;
+}
+
+void RenderTip() {
+    if (!g.tip) return;
+    const std::wstring text = Tr(L"Зажми Shift для перемещения", L"Hold Shift to move");
+    Canvas probe(4, 4);
+    const float textW = TextWidth(*probe.g, text, g.fonts.small.get());
+    const int padX = (int)std::lround(11 * g.scale);
+    const int height = (int)std::lround(30 * g.scale);
+    const int width = (int)std::lround(textW) + padX * 2;
+    g.tipW = width;
+    g.tipH = height;
+
+    Canvas canvas(width, height);
+    Graphics& g2 = *canvas.g;
+    const int radius = (int)std::lround(8 * g.scale);
+    FillRound(g2, RectF(0, 0, (float)width, (float)height), (float)radius, g.theme.card);
+    StrokeRound(g2, RectF(0.5f, 0.5f, width - 1.0f, height - 1.0f), (float)radius, g.theme.border, 1.0f);
+    Text(g2, text, g.fonts.small.get(), RectF((float)padX, 0, textW + 2, (float)height),
+         g.theme.text, StringAlignmentNear);
+
+    const RECT pill = g.pillRect;
+    int tipX = (pill.left + pill.right) / 2 - width / 2;
+    int tipY = pill.top - height - (int)std::lround(8 * g.scale);
+    const BarLayout layout = BarForMonitor(MonitorAt(g.settings->monitorIndex));
+    const RECT mon = layout.monitor;
+    if (tipY < mon.top + 4) tipY = pill.bottom + (int)std::lround(8 * g.scale);
+    tipX = std::clamp(tipX, (int)mon.left + 4, (int)mon.right - width - 4);
+    tipY = std::clamp(tipY, (int)mon.top + 4, (int)mon.bottom - height - 4);
+
+    canvas.Present(g.tip, tipX, tipY);
+}
+
+void ShowTip() {
+    if (!g.tip || g.fullscreen || g.taskbarHidden || g.dragArmed || g.visible) return;
+    RenderTip();
+    ShowWindow(g.tip, SW_SHOWNOACTIVATE);
+    SetWindowPos(g.tip, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    g.tipVisible = true;
+}
+
 // The taskbar pill is a metric-for-metric native re-creation of PowerVision's widget:
 // a 40 DIP window with a 38 DIP, radius-5 root; 8 DIP side padding; each device has a 5 DIP
 // margin, a 13.5 DIP Fluent glyph, a 16x9.5 battery capsule, an optional 9.5 DIP bolt and 12 DIP
@@ -518,9 +581,9 @@ void RenderPill() {
     const BarLayout layout = BarForMonitor(MonitorAt(g.settings->monitorIndex));
     RECT barRect = layout.bar, notifyRect = layout.notify;
     const int barW = barRect.right - barRect.left, barH = barRect.bottom - barRect.top;
-    if (layout.found && barW <= barH) return;   // vertical taskbar
+    if (!g.settings->pillFree && layout.found && barW <= barH) return;   // vertical taskbar
 
-    if (g.taskbarHidden) {
+    if (g.taskbarHidden && !g.settings->pillFree) {
         ShowWindow(g.pill, SW_HIDE);
         return;
     }
@@ -691,6 +754,16 @@ void RenderPill() {
     }
 
     int px = 0, py = 0;
+    if (g.settings->pillFree) {
+        const RECT& mon = layout.monitor;
+        px = (int)mon.left + (int)std::lround(g.settings->pillFreeX * g.scale);
+        py = (int)mon.top + (int)std::lround(g.settings->pillFreeY * g.scale);
+        px = std::clamp(px, (int)mon.left + 4, (int)mon.right - width - 4);
+        py = std::clamp(py, (int)mon.top + 4, (int)mon.bottom - height - 4);
+        g.pillRect = { px, py, px + width, py + height };
+        canvas.Present(g.pill, px, py);
+        return;
+    }
     if (!layout.found) {
         // A monitor without its own taskbar: sit just above the bottom of its work area.
         px = layout.work.right - width - (int)std::lround(12 * g.scale);
@@ -854,7 +927,11 @@ void RenderPanel() {
     int panelX = center - width / 2;
     int panelY = 0;
     bool belowTaskbar = false;
-    if (barAtTop) {
+    if (g.settings->pillFree) {
+        const int above = g.pillRect.top - height - (int)std::lround(8 * g.scale);
+        panelY = above >= (int)work.top + 8 ? above
+                                            : g.pillRect.bottom + (int)std::lround(8 * g.scale);
+    } else if (barAtTop) {
         belowTaskbar = true;
         panelY = work.top + (int)std::lround(8 * g.scale);
     } else if (g.pillRect.top > 0 && (!layout.found || g.pillRect.top < bar.top)) {
@@ -960,6 +1037,7 @@ void RebuildFonts() {
 void ShowPanelInternal() {
     g.visible = true;
     if (!g.panel) return;
+    HideTip();
     if (!g.reveal) g.reveal = 0.0f;
     g.animLast = 0;
     RenderPanel();
@@ -1147,19 +1225,39 @@ LRESULT CALLBACK PillProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 POINT p{};
                 GetCursorPos(&p);
                 const int dx = p.x - g.dragStartX;
-                if (!g.dragMoved && std::abs(dx) >= GetSystemMetrics(SM_CXDRAG)) g.dragMoved = true;
+                const int dy = p.y - g.dragStartY;
+                if (!g.dragMoved &&
+                    std::max(std::abs(dx), std::abs(dy)) >= GetSystemMetrics(SM_CXDRAG))
+                    g.dragMoved = true;
                 if (g.dragMoved) {
                     const BarLayout layout = BarForMonitor(MonitorAt(g.settings->monitorIndex));
-                    RECT bar = layout.found ? layout.bar : layout.work;
-                    if (g.pillRect.right > g.pillRect.left) {
+                    if (g.dragFree) {
                         const int width = g.pillRect.right - g.pillRect.left;
-                        const int minLeft = bar.left + (int)std::lround(4 * g.scale);
-                        const int maxLeft = bar.right - width - (int)std::lround(4 * g.scale);
-                        const int left = std::clamp(g.dragStartLeft + dx, minLeft, maxLeft);
-                        g.settings->pillManual = true;
-                        g.settings->pillOffset =
-                            std::clamp((int)std::lround((bar.right - (left + width)) / g.scale), 0, 4000);
+                        const int height = g.pillRect.bottom - g.pillRect.top;
+                        const RECT& mon = layout.monitor;
+                        const int px = std::clamp(g.dragStartLeft + dx, (int)mon.left + 4,
+                                                  (int)mon.right - width - 4);
+                        const int py = std::clamp(g.dragStartTop + dy, (int)mon.top + 4,
+                                                  (int)mon.bottom - height - 4);
+                        g.settings->pillFree = true;
+                        g.settings->pillFreeX =
+                            (int)std::lround((px - (int)mon.left) / g.scale);
+                        g.settings->pillFreeY =
+                            (int)std::lround((py - (int)mon.top) / g.scale);
+                        g.settings->pillManual = false;
                         RenderPill();
+                    } else {
+                        RECT bar = layout.found ? layout.bar : layout.work;
+                        if (g.pillRect.right > g.pillRect.left) {
+                            const int width = g.pillRect.right - g.pillRect.left;
+                            const int minLeft = bar.left + (int)std::lround(4 * g.scale);
+                            const int maxLeft = bar.right - width - (int)std::lround(4 * g.scale);
+                            const int left = std::clamp(g.dragStartLeft + dx, minLeft, maxLeft);
+                            g.settings->pillManual = true;
+                            g.settings->pillOffset =
+                                std::clamp((int)std::lround((bar.right - (left + width)) / g.scale), 0, 4000);
+                            RenderPill();
+                        }
                     }
                 }
                 return 0;
@@ -1168,18 +1266,31 @@ LRESULT CALLBACK PillProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 g.pillHover = true;
                 TrackLeave(h);
                 RenderPill();
+                SetTimer(h, kPillTipTimer, 600, nullptr);
             }
             return 0;
         }
+        case WM_TIMER:
+            if (wp == kPillTipTimer) {
+                KillTimer(h, kPillTipTimer);
+                ShowTip();
+                return 0;
+            }
+            break;
         case WM_LBUTTONDOWN:
+            KillTimer(h, kPillTipTimer);
+            HideTip();
             if ((GetKeyState(VK_SHIFT) < 0 || g.settings->pillUnlocked) && g.pillRect.right > g.pillRect.left) {
                 POINT p{};
                 GetCursorPos(&p);
                 g.dragArmed = true;
                 g.dragMoved = false;
+                g.dragFree = g.settings->pillUnlocked && (GetKeyState(VK_SHIFT) >= 0);
+                if (!g.dragFree) g.settings->pillFree = false;
                 g.dragStartX = p.x;
+                g.dragStartY = p.y;
                 g.dragStartLeft = g.pillRect.left;
-                g.dragStartRight = g.pillRect.right;
+                g.dragStartTop = g.pillRect.top;
                 SetCapture(h);
                 return 0;
             }
@@ -1196,6 +1307,8 @@ LRESULT CALLBACK PillProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 }
                 // A click without movement is still a click: open/close the panel below.
             }
+            HideTip();
+            KillTimer(h, kPillTipTimer);
             // Debounce: a burst of clicks is one gesture, not a flicker of open/close animations.
             static ULONGLONG lastToggle = 0;
             const ULONGLONG now = GetTickCount64();
@@ -1211,13 +1324,17 @@ LRESULT CALLBACK PillProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             return 0;
         case WM_SETCURSOR:
             if (LOWORD(lp) == HTCLIENT) {
-                SetCursor(LoadCursorW(nullptr, (GetKeyState(VK_SHIFT) < 0 || g.dragArmed || g.settings->pillUnlocked)
-                                                 ? IDC_SIZEWE : IDC_ARROW));
+                const bool free = g.settings->pillUnlocked && (GetKeyState(VK_SHIFT) >= 0);
+                SetCursor(LoadCursorW(nullptr, free || g.dragFree ? IDC_SIZEALL
+                                         : (GetKeyState(VK_SHIFT) < 0 || g.dragArmed) ? IDC_SIZEWE
+                                                                                     : IDC_ARROW));
                 return TRUE;
             }
             break;
         case WM_MOUSELEAVE:
             g.pillHover = false;
+            KillTimer(h, kPillTipTimer);
+            HideTip();
             RenderPill();
             // Leaving the pill also counts as "away": the panel closes shortly unless the cursor
             // lands on it (then the panel's own WM_MOUSEMOVE cancels the timer).
@@ -1295,7 +1412,12 @@ LRESULT CALLBACK PanelProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     return DefWindowProcW(h, msg, wp, lp);
 }
 
-HWND CreateLayeredWindow(const wchar_t* cls, WNDPROC proc, const wchar_t* title) {
+LRESULT CALLBACK TipProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
+    if (msg == WM_MOUSEACTIVATE) return MA_NOACTIVATE;
+    return DefWindowProcW(h, msg, wp, lp);
+}
+
+HWND CreateLayeredWindow(const wchar_t* cls, WNDPROC proc, const wchar_t* title, DWORD extraStyle = 0) {
     WNDCLASSEXW wc{};
     wc.cbSize = sizeof(wc);
     wc.lpfnWndProc = proc;
@@ -1304,8 +1426,8 @@ HWND CreateLayeredWindow(const wchar_t* cls, WNDPROC proc, const wchar_t* title)
     wc.lpszClassName = cls;
     RegisterClassExW(&wc);
 
-    HWND wnd = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, cls, title,
-                               WS_POPUP, 0, 0, 10, 10, nullptr, nullptr, g.inst, nullptr);
+    HWND wnd = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | extraStyle,
+                               cls, title, WS_POPUP, 0, 0, 10, 10, nullptr, nullptr, g.inst, nullptr);
     return wnd;
 }
 
@@ -1365,7 +1487,8 @@ bool Init(HINSTANCE inst, Settings* settings, Hooks hooks) {
 
     g.panel = CreateLayeredWindow(L"WattPillPanel", PanelProc, L"WattPill panel");
     g.pill = CreateLayeredWindow(L"WattPillPill", PillProc, L"WattPill");
-    if (!g.pill || !g.panel) return false;
+    g.tip = CreateLayeredWindow(L"WattPillTip", TipProc, L"WattPill hint", WS_EX_TRANSPARENT);
+    if (!g.pill || !g.panel || !g.tip) return false;
 
     g.taskbarCreatedMessage = RegisterWindowMessageW(L"TaskbarCreated");
     g.winEventHook = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, nullptr,
@@ -1433,6 +1556,12 @@ void Shutdown() {
         DestroyWindow(g.panel);
         g.panel = nullptr;
     }
+    if (g.tip) {
+        ClearLayered(g.tip);
+        ShowWindow(g.tip, SW_HIDE);
+        DestroyWindow(g.tip);
+        g.tip = nullptr;
+    }
     DwmFlush();
     if (HWND bar = FindWindowW(L"Shell_TrayWnd", nullptr))
         RedrawWindow(bar, nullptr, nullptr, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW | RDW_FRAME);
@@ -1464,6 +1593,7 @@ void Tick() {
         g.fullscreen = fs;
         if (fs) {
             ShowWindow(g.pill, SW_HIDE);
+            HideTip();
             HidePanelInternal();
         } else if (g.settings->showPill && !g.taskbarHidden) {
             ShowWindow(g.pill, SW_SHOWNOACTIVATE);
@@ -1484,13 +1614,14 @@ void Tick() {
     }
     RECT bar = layout.bar;
     const RECT monRect = layout.monitor;
-    const bool barHidden = layout.found &&
+    const bool barHidden = !g.settings->pillFree && layout.found &&
                            (!IsWindowVisible(layout.taskbar) || bar.right <= bar.left || bar.bottom <= bar.top ||
                             bar.top >= monRect.bottom - 2 || bar.bottom <= monRect.top + 2);
     if (barHidden != g.taskbarHidden) {
         g.taskbarHidden = barHidden;
         if (barHidden) {
             ShowWindow(g.pill, SW_HIDE);
+            HideTip();
             HidePanelInternal();
         } else if (g.settings->showPill && !g.fullscreen) {
             ShowWindow(g.pill, SW_SHOWNOACTIVATE);

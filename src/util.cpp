@@ -53,8 +53,17 @@ std::wstring FormatSpan(int minutes) {
     if (minutes < 0) minutes = 0;
     const bool ru = RussianUi();
     if (minutes < 1) return ru ? L"меньше минуты" : L"less than a minute";
-    if (minutes >= 24 * 60) return ru ? L"больше суток" : L"more than a day";
-    int h = minutes / 60, m = minutes % 60;
+    if (minutes < 60) return ru ? Fmt(L"%d мин", minutes) : Fmt(L"%d min", minutes);
+
+    const int days = minutes / (24 * 60);
+    const int h = (minutes % (24 * 60)) / 60;
+    const int m = minutes % 60;
+
+    if (days >= 30) return ru ? L"больше месяца" : L"more than a month";
+    if (days > 0) {
+        if (h == 0) return ru ? Fmt(L"%d д", days) : Fmt(L"%d d", days);
+        return ru ? Fmt(L"%d д %d ч", days, h) : Fmt(L"%d d %d h", days, h);
+    }
     if (h == 0) return ru ? Fmt(L"%d мин", m) : Fmt(L"%d min", m);
     if (m == 0) return ru ? Fmt(L"%d ч", h) : Fmt(L"%d h", h);
     return ru ? Fmt(L"%d ч %02d мин", h, m) : Fmt(L"%d h %02d min", h, m);

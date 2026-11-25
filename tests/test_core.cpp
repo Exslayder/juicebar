@@ -96,11 +96,10 @@ void TestLearningCountdown() {
     Check(f.needSec > 0 && f.needSec < 10 * 60, "the countdown reflects the observed span");
     Check(f.needSec <= 15 * 60, "the countdown never exceeds the calibration window");
 
-    // A sample 16 minutes back completes the window; a steady level is then flat, not an endless
-    // calibration.
+    // A steady level is still "learning": we do not invent a drain that the device never showed.
     series.push_back(MakeSample(L"test:2", now - 16 * 60, 90));
     Forecast g = Estimate(series, 90, false, now);
-    Check(g.state != ForecastState::Learning, "15 min of data finishes the calibration");
+    Check(g.state == ForecastState::Learning, "a steady level still waits for a measurable drop");
 }
 
 void TestDischargeForecast() {
@@ -130,7 +129,7 @@ void TestFlat() {
     for (int i = 0; i <= 12; i++)
         series.push_back(MakeSample(L"test:1", now - (12 - i) * 300, 80));
     Forecast f = Estimate(series, 80, false, now);
-    Check(f.state == ForecastState::Flat, "unchanged level reports no drain");
+    Check(f.state == ForecastState::Learning, "unchanged level asks for more data instead of inventing a drain");
 }
 
 void TestCharging() {

@@ -12,6 +12,9 @@ struct Settings {
     bool pillManual = false; // the user dragged the pill
     int pillOffset = 12;     // DIP from the taskbar's right edge when pillManual
     bool pillUnlocked = false; // "Move widget": drag the pill without holding Shift
+    bool pillFree = false;     // free 2D position on the monitor
+    int pillFreeX = 0;         // DIPs from the monitor's left edge
+    int pillFreeY = 0;         // DIPs from the monitor's top edge
     int pillMode = 0;          // 0 detailed, 1 compact, 2 percent only
     bool pillBackground = false; // draw the Fluent taskbar plate behind the pill
     bool hideFullscreen = true;  // hide the widget in fullscreen apps

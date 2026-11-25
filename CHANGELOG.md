@@ -12,8 +12,9 @@ All notable changes to WattPill are documented here. The format follows
   height, and hides while the taskbar auto-hides. A 300 ms guard plus a foreground WinEvent hook
   keeps it above `Shell_TrayWnd` without `SetParent`; Explorer restarts and display changes
   re-anchor it.
-- Manual pill position: Shift-drag, *Placement → Move widget*, and *Placement → Reset position*.
-  The offset is stored in `settings.ini`.
+- Manual pill position: Shift-drag moves it along the taskbar; *Placement → Move widget* drags it
+  freely anywhere on the monitor; *Placement → Reset position* returns to the default.
+- Hovering the pill shows a small rounded hint: *Зажми Shift для перемещения*.
 - Pill styles: detailed (glyph, battery capsule, percentage), compact (glyph and percentage) and
   percent only, plus an optional Fluent background plate.
 - While charging, the pill bolt and percentage are green.
@@ -35,8 +36,9 @@ All notable changes to WattPill are documented here. The format follows
 - The panel keeps WattPill's own visual language (Inter, neutral cards, violet accent, Fluent
   battery marks) with no chrome.
 - Devices that stop answering are removed instead of being shown as disconnected.
-- Forecasts are more stable: Theil–Sen slope instead of least squares, a 10-minute observation
-  window, no "calibration countdown", rounded remaining time and a `via · …` status prefix.
+- Forecasts now use the observed discharge runs from up to 30 days (split by charging sessions and
+  gaps), prefer the last 12 hours, fall back to the median of the last 7 days, round the result to
+  minutes/hours/days, and show `Мало данных для прогноза` instead of a made-up "steady" state.
 - Polling defaults to 15 seconds (PowerVision polls every 10 seconds) for fresher percentages.
 
 ### Fixed

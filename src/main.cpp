@@ -187,7 +187,6 @@ void ShowMenu(HWND owner) {
     AppendMenuW(menu, MF_STRING | MF_DISABLED, 0, L"WattPill");
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, ID_REFRESH, T(L"Обновить", L"Refresh"));
-    AppendMenuW(menu, MF_STRING, ID_PANEL, T(L"Открыть панель", L"Open panel"));
     AppendMenuW(menu, MF_STRING | (app.settings.autoStart ? MF_CHECKED : MF_UNCHECKED), ID_AUTOSTART,
                 T(L"Автозагрузка", L"Start with Windows"));
 
@@ -288,6 +287,7 @@ void HandleCommand(UINT id) {
     }
     if (id == ID_PLACE_CLOCK || id == ID_PLACE_TASKBAR) {
         app.settings.pillPlacement = id == ID_PLACE_TASKBAR ? 1 : 0;
+        app.settings.pillFree = false;
         SaveSettingsNow();
         ui::SetSettings(app.settings);
         return;
@@ -295,6 +295,7 @@ void HandleCommand(UINT id) {
     if (id == ID_PLACE_RESET) {
         app.settings.pillManual = false;
         app.settings.pillOffset = 12;
+        app.settings.pillFree = false;
         SaveSettingsNow();
         ui::SetSettings(app.settings);
         return;
@@ -381,8 +382,8 @@ void BuildCards(const std::vector<Reading>& fresh, int64_t now) {
         ui::Card card;
         card.reading = state.last;
         if (state.last.asleep && !app.settings.dimSleeping) card.reading.asleep = false;
-        std::vector<Sample> six = app.history.Get(id, now - 6 * 3600);
-        card.forecast = Estimate(six, card.reading.percent, card.reading.charging && !card.reading.asleep, now);
+        std::vector<Sample> history = app.history.Get(id, now - 30LL * 24 * 3600);
+        card.forecast = Estimate(history, card.reading.percent, card.reading.charging && !card.reading.asleep, now);
         cards.push_back(std::move(card));
     }
 

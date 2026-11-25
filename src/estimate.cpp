@@ -75,6 +75,56 @@ int RoundForecastMinutes(double minutes) {
     return std::max(5, value);
 }
 
+struct DischargeSegment {
+    int drop = 0;
+    double hours = 0;
+    int64_t end = 0;
+};
+
+std::vector<DischargeSegment> BuildDischargeSegments(const std::vector<Sample>& points) {
+    std::vector<DischargeSegment> out;
+    size_t start = 0;
+    size_t prev = 0;
+    bool active = false;
+
+    auto close = [&](size_t first, size_t last) {
+        if (last <= first) return;
+        const int drop = points[first].percent - points[last].percent;
+        const double hours = (double)(points[last].t - points[first].t) / 3600.0;
+        if (drop >= 1 && hours >= 0.25)
+            out.push_back({ drop, hours, points[last].t });
+    };
+
+    for (size_t i = 0; i < points.size(); i++) {
+        if (points[i].charging) {
+            if (active) close(start, prev);
+            active = false;
+            continue;
+        }
+        if (!active) {
+            start = i;
+            prev = i;
+            active = true;
+            continue;
+        }
+        const int64_t gap = points[i].t - points[prev].t;
+        if (gap <= 0 || gap > 30 * 60 || points[i].percent > points[prev].percent + 1) {
+            close(start, prev);
+            start = i;
+        }
+        prev = i;
+    }
+    if (active) close(start, prev);
+    return out;
+}
+
+double Median(std::vector<double> values) {
+    if (values.empty()) return 0;
+    const size_t mid = values.size() / 2;
+    std::nth_element(values.begin(), values.begin() + mid, values.end());
+    return values[mid];
+}
+
 } // namespace
 
 int VoltageToPercent(int millivolts) {
@@ -96,7 +146,7 @@ Forecast Estimate(const std::vector<Sample>& history, int percentNow, bool charg
     if (percentNow < 0) return f;
     percentNow = std::clamp(percentNow, 0, 100);
 
-    const int64_t horizon = now - 6 * 3600;
+    const int64_t horizon = now - 30LL * 24 * 3600;
     std::vector<Sample> points;
     points.reserve(history.size() + 1);
     for (const auto& s : history) {
@@ -146,36 +196,62 @@ Forecast Estimate(const std::vector<Sample>& history, int percentNow, bool charg
     if (points.back().t >= now - 180) points.back().percent = percentNow;
     else points.push_back({ L"", now, percentNow, false });
 
-    Fit fit = FitTrailing(points, false);
-    f.samples = fit.n;
-    f.spanSec = fit.span;
-    if (!fit.ok) {
+    f.samples = (int)points.size();
+    f.spanSec = points.back().t - points.front().t;
+
+    // Discharge is measured per uninterrupted run: a charging session, a PC reboot or a long gap
+    // starts a new run, so a recharge is never mistaken for a slow drain.
+    const std::vector<DischargeSegment> segments = BuildDischargeSegments(points);
+    if (segments.empty()) {
         f.state = ForecastState::Learning;
-        f.needSec = (int)std::max<int64_t>(5 * 60, 10 * 60 - fit.span);
+        f.needSec = 5 * 60;
         return f;
     }
 
-    f.pctPerHour = -fit.slope;
-    // A device that idles at a fraction of a percent per hour would produce a fantasy
-    // forecast of several days. Show "steady" until the drain is actually measurable.
-    if (f.pctPerHour < 0.5 || fit.drop < 1) {
-        f.state = ForecastState::Flat;
+    const DischargeSegment& last = segments.back();
+    f.spanSec = (int64_t)std::lround(last.hours * 3600.0);
+    const bool recent = last.end >= now - 12 * 3600 && last.drop >= 2 && last.hours >= 0.5;
+
+    double rate = 0;   // percent points per hour
+    double confidence = 0.3;
+    if (recent) {
+        rate = last.drop / last.hours;
+        confidence = (last.drop >= 5 && last.hours >= 1.0) ? 0.8 : 0.6;
+    } else {
+        std::vector<double> rates;
+        for (const auto& segment : segments) {
+            if (segment.drop >= 2 && segment.hours >= 0.5 && segment.end >= now - 7LL * 24 * 3600)
+                rates.push_back(segment.drop / segment.hours);
+        }
+        if (rates.empty()) {
+            // One short run is better than no number, but it is explicitly preliminary.
+            if (last.drop >= 1 && last.hours >= 0.25) {
+                rate = last.drop / last.hours;
+                confidence = 0.35;
+            }
+        } else {
+            rate = Median(rates);
+            confidence = 0.45;
+        }
+    }
+
+    if (rate <= 0) {
+        f.state = ForecastState::Learning;
         return f;
     }
+
+    f.pctPerHour = rate;
     if (percentNow == 0) {
         f.state = ForecastState::Ready;
         f.minutes = 0;
         return f;
     }
 
-    const double minutes = (double)percentNow / f.pctPerHour * 60.0;
-    if (!std::isfinite(minutes) || minutes > 7 * 24 * 60) {
-        f.state = ForecastState::Flat;
-        return f;
-    }
+    double minutes = (double)percentNow / rate * 60.0;
+    if (!std::isfinite(minutes) || minutes > 60.0 * 24 * 60) minutes = 60.0 * 24 * 60;
     f.minutes = RoundForecastMinutes(minutes);
-    f.confidence = Confidence(fit.span, std::max(0, fit.drop));
-    f.state = f.confidence >= 0.6 ? ForecastState::Ready : ForecastState::LowConfidence;
+    f.confidence = confidence;
+    f.state = confidence >= 0.6 ? ForecastState::Ready : ForecastState::LowConfidence;
     return f;
 }
 
