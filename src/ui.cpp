@@ -211,6 +211,8 @@ struct State {
     bool visible = false;
 
     int hoveredCard = -1;
+    int hoveredEye = -1;
+    std::vector<RectF> eyeRects;
     PanelMode panelMode = PanelMode::Devices;
     std::vector<SettingHit> settingHits;
     int hoveredSetting = -1;
@@ -382,9 +384,14 @@ bool IsLow(const Card& card) {
     return card.reading.connected && card.reading.percent >= 0 && card.reading.percent <= 20 && !card.reading.charging;
 }
 
+bool HiddenFromPill(const std::wstring& id) {
+    return std::find(g.settings->hiddenDevices.begin(), g.settings->hiddenDevices.end(), id) !=
+           g.settings->hiddenDevices.end();
+}
+
 Color PercentColor(const Card& card) {
     if (IsLow(card)) return g.theme.red;
-    if (card.reading.charging) return g.theme.charging;
+    if (card.reading.charging) return g.theme.green;
     if (card.reading.asleep || !card.reading.connected) return g.theme.faint;
     return g.theme.text;
 }
@@ -644,7 +651,7 @@ void RenderPill() {
 
     std::vector<const Card*> shown;
     for (const auto& card : g.cards)
-        if (card.reading.connected) shown.push_back(&card);
+        if (card.reading.connected && !HiddenFromPill(card.reading.id)) shown.push_back(&card);
 
     Canvas probe(4, 4);
     Graphics& pg = *probe.g;
@@ -742,10 +749,13 @@ void RenderPill() {
         const BYTE alpha = card.reading.asleep ? 150 : 255;
 
         if (showIcon) {
+            const Color glyphColor = off ? g.theme.pillSub
+                                   : card.reading.charging ? g.theme.pillInk
+                                   : card.reading.percent <= 20 ? g.theme.battLow : g.theme.pillInk;
             addText(KindGlyph(card.reading.kind), g.fonts.pillGlyph.get(), dwtext::Face::Glyph,
                     13.5f * g.scale, 400,
                     RectF(item.x, cy - 9 * g.scale, item.glyphW + 2 * g.scale, 18 * g.scale),
-                    WithAlpha(off ? g.theme.pillSub : g.theme.pillInk, alpha), StringAlignmentNear);
+                    WithAlpha(glyphColor, alpha), StringAlignmentNear);
         }
 
         if (showCapsule) {
@@ -856,7 +866,16 @@ float TargetPercent(const Card& card) {
     return pct < 0 ? 0.0f : (float)std::clamp(pct, 0, 100);
 }
 
-void DrawBatteryLevel(Graphics& g2, RectF box, const Card& card, float shownPercent) {
+void DrawBatteryLevel(Graphics& g2, RectF box, const Card& card, float shownPercent, bool hidden) {
+    if (hidden) {
+        const float level = std::clamp(shownPercent, 0.0f, 100.0f) / 10.0f;
+        const int lo = std::clamp((int)std::floor(level), 0, 10);
+        const int hi = std::min(10, lo + 1);
+        const float frac = level - (float)lo;
+        g.icons.Draw(g2, icoBattery0 + lo, box, g.theme.faint, 130);
+        if (frac > 0.02f) g.icons.Draw(g2, icoBattery0 + hi, box, g.theme.faint, (BYTE)(130 * frac));
+        return;
+    }
     if (card.reading.charging) {
         // Ready-made Fluent "battery charge" mark, breathing while on power.
         const float pulse = 0.5f + 0.5f * sinf(g.spin * 0.12f);
@@ -874,32 +893,41 @@ void DrawBatteryLevel(Graphics& g2, RectF box, const Card& card, float shownPerc
 }
 
 void DrawCard(Graphics& g2, const Card& card, RectF box) {
+    const bool hidden = HiddenFromPill(card.reading.id);
+    const int cardIndex = (int)(&card - g.cards.data());
     const bool hovered = g.hoveredCard >= 0 && (size_t)g.hoveredCard < g.cards.size() &&
                          &card == &g.cards[(size_t)g.hoveredCard];
-    FillRound(g2, box, 16 * g.scale, hovered ? g.theme.cardHover : g.theme.card);
+    FillRound(g2, box, 16 * g.scale,
+              hidden ? WithAlpha(g.theme.card, hovered ? 170 : 150)
+                     : (hovered ? g.theme.cardHover : g.theme.card));
 
     const float glyphX = box.X + 16 * g.scale;
     const float glyphSize = 22 * g.scale;
-    Color glyphColor = card.reading.charging ? g.theme.green : IsLow(card) ? g.theme.red : g.theme.text;
+    Color glyphColor = hidden ? g.theme.faint
+                     : card.reading.charging ? g.theme.green
+                     : IsLow(card) ? g.theme.red : g.theme.text;
     if (card.reading.asleep || !card.reading.connected) glyphColor = g.theme.faint;
     g.icons.Draw(g2, IconFor(card.reading.kind), RectF(glyphX, box.Y + 16 * g.scale, glyphSize, glyphSize),
-                 glyphColor, card.reading.asleep ? 150 : 255);
+                 glyphColor, hidden ? 130 : (card.reading.asleep ? 150 : 255));
 
     const float right = box.GetRight() - 16 * g.scale;
     const float battW = 24 * g.scale;
     const float pctW = 72 * g.scale;
     const float textX = glyphX + glyphSize + 12 * g.scale;
     const float textW = right - battW - 8 * g.scale - pctW - 10 * g.scale - textX;
-    const BYTE textAlpha = card.reading.asleep || !card.reading.connected ? 165 : 255;
+    const BYTE textAlpha = hidden ? 110 : (card.reading.asleep || !card.reading.connected ? 165 : 255);
 
     Text(g2, card.reading.name, g.fonts.name.get(), RectF(textX, box.Y + 10 * g.scale, textW, 22 * g.scale),
-         WithAlpha(g.theme.text, textAlpha), StringAlignmentNear, true);
+         hidden ? WithAlpha(g.theme.faint, textAlpha) : WithAlpha(g.theme.text, textAlpha),
+         StringAlignmentNear, true);
 
-    Color statusColor = g.theme.sub;
-    if (card.reading.charging) statusColor = g.theme.green;
-    else if (IsLow(card)) statusColor = g.theme.red;
-    else if (card.forecast.state == ForecastState::Ready || card.forecast.state == ForecastState::LowConfidence)
-        statusColor = g.theme.accent;
+    Color statusColor = hidden ? g.theme.faint : g.theme.sub;
+    if (!hidden) {
+        if (card.reading.charging) statusColor = g.theme.green;
+        else if (IsLow(card)) statusColor = g.theme.red;
+        else if (card.forecast.state == ForecastState::Ready || card.forecast.state == ForecastState::LowConfidence)
+            statusColor = g.theme.accent;
+    }
     Text(g2, StatusLine(card), g.fonts.status.get(), RectF(textX, box.Y + 33 * g.scale, textW, 20 * g.scale),
          WithAlpha(statusColor, textAlpha), StringAlignmentNear, true);
 
@@ -908,10 +936,26 @@ void DrawCard(Graphics& g2, const Card& card, RectF box) {
     const float shown = g.ringValues.count(card.reading.id) ? g.ringValues[card.reading.id]
                                                            : TargetPercent(card);
     const RectF batt(right - battW, box.Y + 11 * g.scale, battW, battW);
-    DrawBatteryLevel(g2, batt, card, shown);
+    DrawBatteryLevel(g2, batt, card, shown, hidden);
+    const Color pctColor = hidden ? g.theme.faint : PercentColor(card);
     Text(g2, Fmt(L"%d%%", (int)std::lround(shown)), g.fonts.percent.get(),
          RectF(right - battW - 8 * g.scale - pctW, box.Y + 8 * g.scale, pctW, 28 * g.scale),
-         WithAlpha(PercentColor(card), textAlpha), StringAlignmentFar);
+         WithAlpha(pctColor, textAlpha), StringAlignmentFar);
+
+    // Eye: show/hide this device on the taskbar pill. The panel keeps the row (desaturated), so it
+    // can always be brought back.
+    const RectF eye(box.GetRight() - 16 * g.scale - 26 * g.scale,
+                    box.GetBottom() - 6 * g.scale - 26 * g.scale, 26 * g.scale, 26 * g.scale);
+    g.eyeRects.push_back(eye);
+    const bool eyeHover = g.hoveredEye == cardIndex;
+    if (eyeHover) FillRound(g2, eye, 7 * g.scale, WithAlpha(g.theme.text, 14));
+    const Color eyeColor = hidden ? g.theme.faint : (eyeHover ? g.theme.text : g.theme.sub);
+    const float ex = eye.X + eye.Width / 2, ey = eye.Y + eye.Height / 2;
+    Pen eyePen(eyeColor, 1.5f * g.scale);
+    g2.DrawEllipse(&eyePen, ex - 9 * g.scale, ey - 4.5f * g.scale, 18 * g.scale, 9 * g.scale);
+    SolidBrush pupil(eyeColor);
+    g2.FillEllipse(&pupil, ex - 2.8f * g.scale, ey - 2.8f * g.scale, 5.6f * g.scale, 5.6f * g.scale);
+    if (hidden) g2.DrawLine(&eyePen, ex - 10 * g.scale, ey + 6 * g.scale, ex + 10 * g.scale, ey - 6 * g.scale);
 }
 
 void PlaceAndPresentPanel(Canvas& canvas, int width, int height) {
@@ -976,6 +1020,7 @@ void RenderPanel() {
 
     // ---- cards
     g.cardRects.clear();
+    g.eyeRects.clear();
     float y = (float)pad;
     if (count == 0) {
         RectF box((float)pad, y, (float)(width - pad * 2), 84 * g.scale);
@@ -1308,6 +1353,7 @@ void ShowPanelInternal(PanelMode mode) {
     if (!g.reveal) g.reveal = 0.0f;
     g.animLast = 0;
     g.hoveredCard = -1;
+    g.hoveredEye = -1;
     g.hoveredSetting = -1;
     RenderPanel();
     ShowWindow(g.panel, SW_SHOWNOACTIVATE);
@@ -1319,6 +1365,7 @@ void HidePanelInternal() {
 
     g.visible = false;
     g.hoveredCard = -1;
+    g.hoveredEye = -1;
     g.hoveredSetting = -1;
     if (!g.panel) return;
     KillTimer(g.panel, kPanelTimerHide);
@@ -1640,6 +1687,17 @@ LRESULT CALLBACK PillProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     return DefWindowProcW(h, msg, wp, lp);
 }
 
+void ToggleDeviceHidden(int cardIndex) {
+    if (cardIndex < 0 || (size_t)cardIndex >= g.cards.size()) return;
+    const std::wstring id = g.cards[(size_t)cardIndex].reading.id;
+    auto& hidden = g.settings->hiddenDevices;
+    auto it = std::find(hidden.begin(), hidden.end(), id);
+    if (it == hidden.end()) hidden.push_back(id);
+    else hidden.erase(it);
+    if (g.hooks.settingsApplied) g.hooks.settingsApplied();
+    RenderPanel();
+}
+
 LRESULT CALLBACK PanelProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
         case WM_MOUSEACTIVATE:
@@ -1669,14 +1727,23 @@ LRESULT CALLBACK PanelProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                     break;
                 }
             }
-            if (cardIndex != g.hoveredCard) {
+            int eyeIndex = -1;
+            for (size_t i = 0; i < g.eyeRects.size(); i++) {
+                if (g.eyeRects[i].Contains((float)p.x, (float)p.y)) {
+                    eyeIndex = (int)i;
+                    break;
+                }
+            }
+            if (cardIndex != g.hoveredCard || eyeIndex != g.hoveredEye) {
                 g.hoveredCard = cardIndex;
+                g.hoveredEye = eyeIndex;
                 RenderPanel();
             }
             return 0;
         }
         case WM_MOUSELEAVE:
             g.hoveredCard = -1;
+            g.hoveredEye = -1;
             g.hoveredSetting = -1;
             SetTimer(h, kPanelTimerHide, 200, nullptr);
             RenderPanel();
@@ -1695,7 +1762,15 @@ LRESULT CALLBACK PanelProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             }
             return 0;
         case WM_LBUTTONUP:
-            if (g.panelMode == PanelMode::Settings) {
+            if (g.panelMode == PanelMode::Devices) {
+                const POINT p{ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) };
+                for (size_t i = 0; i < g.eyeRects.size(); i++) {
+                    if (g.eyeRects[i].Contains((float)p.x, (float)p.y)) {
+                        ToggleDeviceHidden((int)i);
+                        break;
+                    }
+                }
+            } else if (g.panelMode == PanelMode::Settings) {
                 const POINT p{ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) };
                 for (const auto& hit : g.settingHits) {
                     if (hit.rect.Contains((float)p.x, (float)p.y)) {

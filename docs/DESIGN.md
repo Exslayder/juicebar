@@ -35,7 +35,10 @@ violet forecast accent. It opens from the pill, centered on the widget, with a s
   right-click menu, so the flyout stays quiet.
 - Each device is an 80 DIP row: a 22 px device glyph, the name in 14.5 px semibold, the status or
   forecast in 13.5 px (prefixed with the connection, e.g. `2.4 GHz · ≈ 4 ч`), the percentage in
-  19 px semibold and a Fluent battery mark that morphs between levels.
+  19 px semibold and a Fluent battery mark that morphs between levels. A small eye in the bottom
+  corner hides the device from the pill; the row stays visible but desaturated, with a slashed eye
+  to bring it back.
+- Charging is green; at 20 % or below the glyph, battery mark, percentage and status turn red.
 - Cards lift slightly on hover. The panel closes 200 ms after the pointer leaves it.
 
 Light/dark is taken from the Windows app theme; the pill separately follows the taskbar theme.

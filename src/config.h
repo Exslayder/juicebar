@@ -19,6 +19,7 @@ struct Settings {
     bool pillBackground = false; // draw the Fluent taskbar plate behind the pill
     bool hideFullscreen = true;  // hide the widget in fullscreen apps
     int monitorIndex = 0;        // 0 = primary, 1 = next monitor, ...
+    std::vector<std::wstring> hiddenDevices; // device ids hidden from the pill
     int language = 0;   // 0 auto, 1 ru, 2 en
 };
 

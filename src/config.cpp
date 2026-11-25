@@ -139,6 +139,18 @@ Settings LoadSettings(const std::wstring& file) {
         else if (key == L"pill_background") s.pillBackground = ToInt(value, 0) != 0;
         else if (key == L"hide_fullscreen") s.hideFullscreen = ToInt(value, 1) != 0;
         else if (key == L"monitor") s.monitorIndex = ToInt(value, 0);
+        else if (key == L"hidden_devices") {
+            s.hiddenDevices.clear();
+            size_t start = 0;
+            while (start <= value.size() && s.hiddenDevices.size() < 128) {
+                const size_t end = value.find(L'|', start);
+                const std::wstring id = value.substr(start, end == std::wstring::npos ? std::wstring::npos : end - start);
+                if (!id.empty() && std::find(s.hiddenDevices.begin(), s.hiddenDevices.end(), id) == s.hiddenDevices.end())
+                    s.hiddenDevices.push_back(id);
+                if (end == std::wstring::npos) break;
+                start = end + 1;
+            }
+        }
         else if (key == L"language") s.language = ToInt(value, 0);
     }
 
@@ -173,6 +185,12 @@ bool SaveSettings(const std::wstring& file, const Settings& s) {
     text += std::string("pill_background=") + (s.pillBackground ? "1" : "0") + "\n";
     text += std::string("hide_fullscreen=") + (s.hideFullscreen ? "1" : "0") + "\n";
     text += "monitor=" + std::to_string(std::clamp(s.monitorIndex, 0, 15)) + "\n";
+    text += "hidden_devices=";
+    for (size_t i = 0; i < s.hiddenDevices.size(); i++) {
+        if (i) text += "|";
+        text += Utf8(s.hiddenDevices[i]);
+    }
+    text += "\n";
     text += "language=" + std::to_string(s.language) + "\n";
 
     const std::wstring tmp = file + L".tmp";

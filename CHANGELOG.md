@@ -17,6 +17,10 @@ All notable changes to WattPill are documented here. The format follows
   default.
 - Hovering the pill shows a two-line hint: *Shift — двигать по панели* and *Ctrl — свободно по
   экрану*.
+- Per-device eye button in the panel: hides the device from the pill and desaturates its row; the
+  choice is stored in `hidden_devices`.
+- Charging percentage in the panel is green; at 20 % or below the pill and panel highlight the
+  glyph, battery mark, percentage and status in red.
 - Pill styles: detailed (glyph, battery capsule, percentage), compact (glyph and percentage) and
   percent only, plus an optional Fluent background plate.
 - While charging, the pill bolt and percentage are green.
