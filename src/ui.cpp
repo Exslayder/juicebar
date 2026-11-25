@@ -622,8 +622,8 @@ void RenderPill() {
     const int barW = barRect.right - barRect.left, barH = barRect.bottom - barRect.top;
     if (!g.settings->pillFree && layout.found && barW <= barH) return;   // vertical taskbar
 
-    if (g.taskbarHidden && !g.settings->pillFree) {
-        ShowWindow(g.pill, SW_HIDE);
+    if (g.taskbarHidden) {
+        if (!g.settings->pillFree) ShowWindow(g.pill, SW_HIDE);
         return;
     }
 
@@ -1106,8 +1106,8 @@ void RenderSettings() {
     Text(g2, L"WattPill", g.fonts.wordmark.get(),
          RectF((float)pad, (float)pad - 2 * g.scale, 240 * g.scale, 32 * g.scale),
          g.theme.text, StringAlignmentNear);
-    Text(g2, Tr(L"Настройки", L"Settings"), g.fonts.small.get(),
-         RectF((float)(width - pad) - 170 * g.scale, (float)pad + 2 * g.scale, 170 * g.scale, 24 * g.scale),
+    Text(g2, Tr(L"Настройки", L"Settings"), g.fonts.status.get(),
+         RectF((float)(width - pad) - 180 * g.scale, (float)pad + 2 * g.scale, 180 * g.scale, 26 * g.scale),
          g.theme.sub, StringAlignmentFar);
 
     FillRound(g2, RectF((float)cardX, (float)cardY, (float)cardW, (float)cardH), 16 * g.scale, g.theme.card);
