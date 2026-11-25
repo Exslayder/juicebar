@@ -1206,9 +1206,9 @@ void RenderSettings() {
             DrawSegments(g2, RectF(right - segW, row.Y + (row.Height - segH) / 2, segW, segH), seg,
                          g.settings->pillPlacement, id);
         } else if (id == kSetStyle) {
-            const std::vector<std::wstring> seg = { Tr(L"Подробно", L"Detailed"),
-                                                    Tr(L"Компактно", L"Compact"),
-                                                    Tr(L"Процент", L"Percent") };
+            const std::vector<std::wstring> seg = { Tr(L"Полный", L"Full"),
+                                                    Tr(L"Компакт", L"Compact"),
+                                                    Tr(L"Минимум", L"Minimal") };
             const float segW = 210 * g.scale, segH = 28 * g.scale;
             DrawSegments(g2, RectF(right - segW, row.Y + (row.Height - segH) / 2, segW, segH), seg,
                          g.settings->pillMode, id);

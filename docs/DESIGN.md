@@ -17,9 +17,9 @@ Windows 11 taskbar palette: green, amber up to 45 %, red up to 20 %, light blue 
 
 Three styles are available from *Pill style* (and saved in `settings.ini`):
 
-- **Detailed** — glyph, capsule and percentage (the default).
+- **Full** — glyph, capsule and percentage (the default).
 - **Compact** — glyph and percentage, without the capsule.
-- **Percent only** — just the percentage.
+- **Minimal** — just the percentage.
 
 The pill is transparent by default; *Pill background* adds the Fluent taskbar plate. Hover paints
 the same faint wash and hairline border as the Explorer tray buttons. Devices that stop answering
@@ -78,7 +78,8 @@ the device list:
   *Настройки* caption on the right;
 - one rounded card with a row per option, separated by a hairline;
 - **toggle switches** for Start with Windows, Move widget, Pill background and Hide in fullscreen;
-- **segmented buttons** for Placement, Pill style, Monitor and Language;
+- **segmented buttons** for Placement, Pill style (*Полный / Компакт / Минимум*), Monitor and
+  Language;
 - a **Reset position** action row;
 - two buttons at the bottom: **Refresh** (accent) and **Exit** (red).
 

@@ -45,9 +45,9 @@ measurement, and it is labelled while the data is still thin.
   device from the pill and its row stays in the panel, desaturated, so it can be brought back.
 - **Color that means something.** Charging is green on the pill and in the panel; at 20 % or below
   the same elements (glyph, capsule/battery mark, percentage and status) turn red.
-- **A pill that matches the taskbar.** Detailed (glyph, mini battery capsule, percentage), compact
-  (glyph and percentage) or percent-only; optional Fluent background plate. While charging, the bolt
-  and the percentage turn green.
+- **A pill that matches the taskbar.** Full (glyph, mini battery capsule, percentage), Compact
+  (glyph and percentage) or Minimal (percentage only); optional Fluent background plate. While
+  charging, the bolt and the percentage turn green.
 - **Any monitor.** *Monitor* in the menu moves the pill and panel to the primary or an additional
   display, using that display's own taskbar.
 - **Starts with Windows.** Enabled on the first run; a checkbox in the right-click menu turns it
@@ -155,7 +155,7 @@ closes when the pointer leaves it.
 - **Pill background** — toggle the Fluent plate.
 - **Hide in fullscreen** — toggle.
 - **Placement** — *Above clock* / *On taskbar*.
-- **Pill style** — *Detailed* / *Compact* / *Percent*.
+- **Pill style** — *Full* / *Compact* / *Minimal*.
 - **Monitor** — *Основной* / *Дополнительный* (only shown with more than one display).
 - **Language** — *Auto* / *Рус* / *Eng*.
 - **Reset position** — returns the pill to its default taskbar spot.
