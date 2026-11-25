@@ -65,7 +65,7 @@ measurement, and it is labelled while the data is still thin.
 
 ## Install
 
-Download `WattPill-2.1.0-setup.exe` from the latest release and run it. The installer is per-user —
+Download `WattPill-2.1.1-setup.exe` from the latest release and run it. The installer is per-user —
 no administrator rights, no UAC prompt. By default it installs into
 `%LOCALAPPDATA%\Programs\WattPill` and adds a Start menu shortcut; the wizard also lets you pick
 another folder (for example `D:\Apps\WattPill`).
@@ -201,7 +201,7 @@ project (no system installation):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\toolchain.ps1
-powershell -ExecutionPolicy Bypass -File build.ps1 -Version 2.1.0
+powershell -ExecutionPolicy Bypass -File build.ps1 -Version 2.1.1
 powershell -ExecutionPolicy Bypass -File test.ps1
 ```
 
@@ -216,7 +216,7 @@ MinGW archive before extracting it.
 To build the installer you need [Inno Setup 6+](https://jrsoftware.org/isinfo.php):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1 -Version 2.1.0
+powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1 -Version 2.1.1
 ```
 
 The result is `dist\WattPill-<version>-setup.exe`.

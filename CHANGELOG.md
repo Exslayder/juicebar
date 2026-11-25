@@ -6,6 +6,14 @@ All notable changes to WattPill are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.1.1] — 2026-11-25
+
+### Fixed
+
+- Fullscreen hiding no longer flickers back after a few seconds when the Alt+Tab / Task View shell
+  overlay takes the foreground while a game is still fullscreen. The guard now stays hidden through
+  shell overlays and device updates cannot force the pill visible.
+
 ## [2.1.0] — 2026-11-25
 
 ### Added

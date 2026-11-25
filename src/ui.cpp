@@ -623,6 +623,7 @@ void ShowTip() {
 // semibold text.
 void RenderPill() {
     if (!g.pill) return;
+    if (g.fullscreen) return;   // the guard owns visibility while a fullscreen app is active
 
     const BarLayout layout = BarForMonitor(MonitorAt(g.settings->monitorIndex));
     RECT barRect = layout.bar, notifyRect = layout.notify;
@@ -1346,6 +1347,7 @@ void RebuildFonts() {
 }
 
 void ShowPanelInternal(PanelMode mode) {
+    if (g.fullscreen) return;
     g.panelMode = mode;
     g.visible = true;
     if (!g.panel) return;
@@ -1433,7 +1435,26 @@ bool ForegroundCoversMonitor(HMONITOR target) {
 
 bool FullscreenApp() {
     if (!g.settings) return false;
-    return ForegroundCoversMonitor(MonitorAt(g.settings->monitorIndex));
+    const HMONITOR target = MonitorAt(g.settings->monitorIndex);
+    if (ForegroundCoversMonitor(target)) return true;
+
+    // Shell overlays (Alt+Tab / Task View) briefly take the foreground while a game is still
+    // fullscreen. Do not treat that as "fullscreen ended": keep the pill hidden until a real
+    // window or the desktop/taskbar takes over.
+    if (g.fullscreen) {
+        HWND fg = GetForegroundWindow();
+        if (fg) {
+            wchar_t cls[128] = {};
+            GetClassNameW(fg, cls, 128);
+            if (!_wcsicmp(cls, L"XamlExplorerHostIslandWindow") ||
+                !_wcsicmp(cls, L"Windows.UI.Core.CoreWindow") ||
+                !_wcsicmp(cls, L"ForegroundStaging") ||
+                !_wcsicmp(cls, L"TaskSwitcherWnd") ||
+                !_wcsicmp(cls, L"MultitaskingViewFrame"))
+                return true;
+        }
+    }
+    return false;
 }
 
 std::wstring FullscreenReportImpl() {
@@ -1957,14 +1978,17 @@ void SetCards(std::vector<Card> cards) {
         if (!g.ringValues.count(card.reading.id)) g.ringValues[card.reading.id] = TargetPercent(card);
     }
 
-    // Keep the pill's height stable even when there is nothing to show.
-    if (g.settings->showPill && g.pill) {
-        ShowWindow(g.pill, SW_SHOWNOACTIVATE);
-        RenderPill();
-    } else if (g.pill) {
-        ShowWindow(g.pill, SW_HIDE);
+    // Keep the pill's height stable even when there is nothing to show, but never override the
+    // fullscreen/taskbar guard: a device update must not bring the pill back by itself.
+    if (g.pill) {
+        if (g.settings->showPill && !g.fullscreen && !g.taskbarHidden) {
+            ShowWindow(g.pill, SW_SHOWNOACTIVATE);
+            RenderPill();
+        } else {
+            ShowWindow(g.pill, SW_HIDE);
+        }
     }
-    if (g.visible) RenderPanel();
+    if (g.visible && !g.fullscreen) RenderPanel();
 }
 
 void Tick() {
