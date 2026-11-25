@@ -811,17 +811,28 @@ void RenderPill() {
         px = std::clamp(px, (int)mon.left + 4, (int)mon.right - width - 4);
         py = std::clamp(py, (int)mon.top + 4, (int)mon.bottom - height - 4);
         g.pillRect = { px, py, px + width, py + height };
-        canvas.Present(g.pill, px, py);
+                canvas.Present(g.pill, px, py);
         return;
     }
     if (!layout.found) {
+        // The taskbar can disappear for a moment while Start opens or while it auto-hides. Do not
+        // fall back to the "monitor without a taskbar" position in that case: keep the last known
+        // taskbar frame instead, otherwise the pill jumps above the clock.
+        const RECT& mon = layout.monitor;
+        const bool lastOnMonitor = g.pillRect.right > g.pillRect.left &&
+                                   g.pillRect.left >= mon.left && g.pillRect.right <= mon.right &&
+                                   g.pillRect.top >= mon.top && g.pillRect.bottom <= mon.bottom;
+        if (lastOnMonitor) {
+                        return;
+        }
+
         // A monitor without its own taskbar: sit just above the bottom of its work area.
         px = layout.work.right - width - (int)std::lround(12 * g.scale);
         py = layout.work.bottom - height - (int)std::lround(4 * g.scale);
         px = std::clamp(px, (int)layout.work.left + 4, (int)layout.work.right - width - 4);
         py = std::clamp(py, (int)layout.monitor.top + 4, (int)layout.monitor.bottom - height - 4);
         g.pillRect = { px, py, px + width, py + height };
-        canvas.Present(g.pill, px, py);
+                canvas.Present(g.pill, px, py);
         return;
     }
 
@@ -849,7 +860,7 @@ void RenderPill() {
     }
 
     g.pillRect = { px, py, px + width, py + height };
-    canvas.Present(g.pill, px, py);
+        canvas.Present(g.pill, px, py);
 }
 
 // ------------------------------------------------------------------ drawing: panel
@@ -1648,7 +1659,7 @@ LRESULT CALLBACK PillProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             {
                 const bool shift = GetKeyState(VK_SHIFT) < 0;
                 const bool ctrl = GetKeyState(VK_CONTROL) < 0;
-                if ((shift || ctrl || g.settings->pillUnlocked) && g.pillRect.right > g.pillRect.left) {
+                                if ((shift || ctrl || g.settings->pillUnlocked) && g.pillRect.right > g.pillRect.left) {
                     POINT p{};
                     GetCursorPos(&p);
                     g.dragArmed = true;
@@ -1667,7 +1678,7 @@ LRESULT CALLBACK PillProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             }
             break;
         case WM_LBUTTONUP: {
-            if (g.dragArmed) {
+                        if (g.dragArmed) {
                 const bool moved = g.dragMoved;
                 g.dragArmed = false;
                 g.dragMoved = false;
@@ -2007,7 +2018,7 @@ void SetCards(std::vector<Card> cards) {
 
     // Keep the pill's height stable even when there is nothing to show, but never override the
     // fullscreen/taskbar guard: a device update must not bring the pill back by itself.
-    if (g.pill) {
+        if (g.pill) {
         if (g.settings->showPill && !g.fullscreen && !g.taskbarHidden) {
             ShowWindow(g.pill, SW_SHOWNOACTIVATE);
             RenderPill();
@@ -2020,6 +2031,13 @@ void SetCards(std::vector<Card> cards) {
 
 void Tick() {
     if (!g.pill || !g.panel) return;
+
+    const bool startMenu = StartMenuOpen();
+    static int lastTickState = -1;
+    const int tickState = (g.fullscreen ? 1 : 0) | (g.taskbarHidden ? 2 : 0) | (startMenu ? 4 : 0);
+    if (tickState != lastTickState) {
+        lastTickState = tickState;
+            }
 
     const bool fs = g.settings->hideFullscreen && FullscreenApp();
     if (fs != g.fullscreen) {
